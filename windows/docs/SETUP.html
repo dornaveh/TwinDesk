@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TwinDesk setup</title><style>body{font:18px/1.6 system-ui;max-width:760px;margin:40px auto;padding:0 24px;color:#17212c}h1,h2{line-height:1.2}code{background:#edf1f4;padding:2px 5px}</style></head>
+<body><h1>Connect your PC and Mac</h1>
+<p>TwinDesk shares your PC keyboard, mouse and audio output with a Mac. Each monitor needs a video cable from each computer.</p>
+<ol><li>Install the Mac companion and grant it Accessibility and audio-capture access when requested.</li>
+<li>Select the PC address reachable from the Mac in TwinDesk. Start the connection, copy the pairing code, and paste it on the Mac. Keep the code private.</li>
+<li>First test keyboard and mouse with monitor switching off. Use the monitor's own input button to show the Mac.</li>
+<li>Refresh monitors and match the PC and Mac inputs to your cables. While disconnected, enable monitor switching, then reconnect and test each direction.</li>
+<li>Enable audio on the Mac and select your desired Windows output. The PC must stay awake.</li></ol>
+<h2>Switching</h2><p>Ctrl + Alt + F12 switches computers. Ctrl + Alt + F11 returns input to Windows. The Mac menu also offers “Switch back to Windows”.</p>
+<h2>Keep the Mac silent</h2><p>The audio tap suppresses local sound while streaming. To keep the Mac mini silent when streaming stops, also mute Mac mini Speakers in macOS Sound settings and turn off the startup sound.</p>
+<h2>Optional storage</h2><p>The direct-link helper changes a dedicated Ethernet adapter and shares C: and E: with your Windows account. Preview and review these changes before applying them; see the supplied README.md. SMB uses your Windows password, not a PIN.</p>
+<h2>If something does not switch</h2><p>This is an experimental preview. Monitor DDC/CI support varies and can fail while the picture remains fine. Use the monitor's physical input button to recover. A software command succeeding does not prove the monitor changed inputs.</p>
+<p>Complete build and usage instructions are in the repository's README and the platform READMEs.</p></body></html>
