@@ -8,30 +8,32 @@ public record AudioDevice(int Id, string Name) { public override string ToString
 
 // Shared mode preserves simultaneous Windows audio. NAudio supplies the Windows
 // interop; queue freshness and the network PCM format remain TwinDesk's policy.
-public sealed class AudioPlayer : IDisposable
+public sealed class AudioPlayer : IAudioOutputBackend
 {
     private readonly object gate = new();
     private readonly LivePcmSource source = new();
     private WasapiPlayer? output;
     private MMDevice? endpoint;
-    private LegacyAudioPlayer? fallback;
     private Exception? playbackError;
     private bool disposed;
     public string Backend { get; private set; } = "";
     public bool LowLatencyActive => output?.LowLatencyActive == true;
     public double EnginePeriodMilliseconds => output?.LatencyMilliseconds ?? 0;
-    public long BytesSubmitted => fallback?.BytesPlayed ?? source.BytesRead;
+    public long BytesSubmitted => source.BytesRead;
     public long DroppedBytes => source.DroppedBytes;
     public double QueuedMilliseconds => source.QueuedBytes / 192.0;
     public double DeviceQueuedMilliseconds { get { lock (gate) return output?.CurrentLatency.TotalMilliseconds ?? 0; } }
     public string? Failure => Volatile.Read(ref playbackError)?.Message;
 
     public AudioPlayer(int id)
+        : this(id == -1 ? null : EndpointId(id)) { }
+
+    public AudioPlayer(string? endpointId)
     {
         try
         {
             using var enumerator = new MMDeviceEnumerator();
-            endpoint = id == -1 ? enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia) : enumerator.GetDevice(EndpointId(id));
+            endpoint = endpointId is null ? enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia) : enumerator.GetDevice(endpointId);
             output = new WasapiPlayerBuilder().WithDevice(endpoint).WithSharedMode().WithEventSync()
                 .WithLatency(20).WithLowLatency(false).WithMmcssThreadPriority("Audio").Build();
             output.Init(source);
@@ -40,11 +42,11 @@ public sealed class AudioPlayer : IDisposable
             if (!output.LowLatencyActive) Backend += $"; {output.LowLatencyUnavailableReason}";
             output.Play();
         }
-        catch (Exception e) when (e is COMException or NotSupportedException or InvalidOperationException or IOException)
+        catch
         {
             output?.Dispose(); output = null; endpoint?.Dispose(); endpoint = null;
-            fallback = new LegacyAudioPlayer(id);
-            Backend = $"Compatibility playback; WASAPI unavailable: {e.Message}";
+            // Never fall back to a waveOut index that may now name another device.
+            throw;
         }
     }
     public static List<AudioDevice> Devices() => LegacyAudioPlayer.Devices();
@@ -55,7 +57,7 @@ public sealed class AudioPlayer : IDisposable
         {
             if (disposed) return;
             if (Failure is { } error) throw new IOException($"Audio output stopped: {error}. Select another speaker output.");
-            if (fallback is not null) fallback.Push(data); else source.Push(data);
+            source.Push(data);
         }
     }
     public void Flush()
@@ -63,7 +65,6 @@ public sealed class AudioPlayer : IDisposable
         lock (gate)
         {
             if (disposed) return;
-            if (fallback is not null) { fallback.Flush(); return; }
             output!.Stop(); source.Clear(); output.Play();
         }
     }
@@ -75,7 +76,6 @@ public sealed class AudioPlayer : IDisposable
             disposed = true;
             output?.Dispose(); output = null;
             endpoint?.Dispose(); endpoint = null;
-            fallback?.Dispose(); fallback = null;
             source.Clear();
         }
     }

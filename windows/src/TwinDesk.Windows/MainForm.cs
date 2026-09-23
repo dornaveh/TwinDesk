@@ -25,7 +25,9 @@ public sealed class MainForm : Form
     private readonly bool startInTray;
     private BridgeServer? server;
     private InputForwarder? input;
-    private AudioPlayer? player;
+    private AudioOutput? player;
+    private bool updatingOutputs;
+    private sealed record OutputChoice(string? Id, string Name) { public override string ToString() => Name; }
     private List<MonitorDescription> detected = [];
     private bool quitting, switching, scanning;
     private bool audioVerified;
@@ -59,8 +61,9 @@ public sealed class MainForm : Form
         networkRow.Controls.AddRange([new Label { Text = "PC address", AutoSize = true, Margin = new Padding(0, 9, 12, 0) }, network, pairing]);
         Add(layout, networkRow, 48);
         var audioRow = new FlowLayoutPanel { Dock = DockStyle.Fill };
-        foreach (var device in AudioPlayer.Devices()) speakers.Items.Add(device);
-        speakers.SelectedItem = speakers.Items.Cast<AudioDevice>().FirstOrDefault(x => x.Name == settings.AudioDeviceName) ?? speakers.Items.Cast<AudioDevice>().FirstOrDefault(x => x.Id == settings.AudioDevice) ?? speakers.Items[0];
+        MigrateAudioSelection();
+        try { RefreshAudioChoices(new WindowsAudioEnvironment().Snapshot()); }
+        catch { RefreshAudioChoices(new OutputSnapshot(null, [])); }
         audioRow.Controls.AddRange([new Label { Text = "Speakers", AutoSize = true, Margin = new Padding(0, 9, 24, 0) }, speakers]);
         Add(layout, audioRow, 43); Add(layout, audioStatus, 32);
         displays.Checked = settings.SwitchDisplays;
@@ -82,6 +85,19 @@ public sealed class MainForm : Form
             var index = e.Index >= 0 ? e.Index : speakers.SelectedIndex;
             if (index >= 0) TextRenderer.DrawText(e.Graphics, speakers.Items[index]?.ToString() ?? "", e.Font ?? Font, e.Bounds, Color.Black, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
             e.DrawFocusRectangle();
+        };
+        speakers.SelectedIndexChanged += (_, _) => {
+            if (updatingOutputs || speakers.SelectedItem is not OutputChoice selected) return;
+            settings.AudioEndpointId = selected.Id;
+            settings.AudioDeviceName = selected.Name;
+            settings.AudioDevice = selected.Id is null ? -1 : 0; // Legacy field; stable ID is authoritative.
+            try { settings.Save(); } catch (Exception e) { Note("Could not save audio selection: " + e.Message); }
+            audioVerified = false;
+            player?.Select(selected.Id);
+        };
+        speakers.DropDown += async (_, _) => {
+            try { RefreshAudioChoices(await Task.Run(() => new WindowsAudioEnvironment().Snapshot())); }
+            catch (Exception e) { Note("Could not refresh audio outputs: " + e.Message); }
         };
         connection.ForeColor = Color.FromArgb(113, 211, 196);
         var menu = new ContextMenuStrip();
@@ -114,7 +130,7 @@ public sealed class MainForm : Form
         audioTimer.Tick += (_, _) => {
             var bytes = player?.BytesSubmitted ?? 0;
             var playing = bytes > previousAudio;
-            audioStatus.Text = playing ? "Mac audio is playing through the selected speakers." : server?.Connected == true ? "Audio connected · waiting for sound from the Mac." : "Mac audio will play independently of the selected computer.";
+            audioStatus.Text = player is { Available: false } ? player.Status : playing ? "Mac audio is playing through the selected speakers." : server?.Connected == true ? "Audio connected · waiting for sound from the Mac." : "Mac audio will play independently of the selected computer.";
             if (playing && !audioVerified) { StartupTrace.Write($"Mac audio submitted to PC output; bytes={bytes}; queued={player?.QueuedMilliseconds:F1} ms; dropped={player?.DroppedBytes}"); audioVerified = true; }
             previousAudio = bytes;
         };
@@ -124,7 +140,6 @@ public sealed class MainForm : Form
         Microsoft.Win32.SystemEvents.PowerModeChanged += PowerChanged;
         Shown += async (_, _) => {
             if (startInTray) StartupTrace.Write("shown");
-            speakers.SelectedItem = speakers.Items.Cast<AudioDevice>().FirstOrDefault(x => x.Name == settings.AudioDeviceName) ?? speakers.Items[0];
             if (startInTray)
             {
                 Hide();
@@ -141,6 +156,39 @@ public sealed class MainForm : Form
         FormClosing += (_, e) => { if (!quitting && server is not null && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); tray.ShowBalloonTip(2000, "TwinDesk is still running", "Use the tray menu to quit and return control to the PC.", ToolTipIcon.Info); } else { input?.Dispose(); Microsoft.Win32.SystemEvents.SessionSwitch -= SessionChanged; Microsoft.Win32.SystemEvents.PowerModeChanged -= PowerChanged; tray.Dispose(); audioTimer.Dispose(); identity.Dispose(); } };
     }
     private record InputChoice(uint Value, string Name);
+    private void MigrateAudioSelection()
+    {
+        if (settings.AudioEndpointId is not null || settings.AudioDevice == -1) return;
+        try
+        {
+            var matches = AudioPlayer.Devices().Where(d => d.Id >= 0 && d.Name == settings.AudioDeviceName).ToArray();
+            // Old waveOut indices can be recycled; only a single matching saved
+            // device name is enough evidence to migrate to a stable endpoint ID.
+            settings.AudioEndpointId = matches.Length == 1 ? AudioPlayer.EndpointId(matches[0].Id) : "unavailable-legacy-output";
+        }
+        catch { settings.AudioEndpointId = "unavailable-legacy-output"; }
+        // A missing explicit output remains explicit; never silently choose the default.
+    }
+    private void RefreshAudioChoices(OutputSnapshot snapshot)
+    {
+        updatingOutputs = true;
+        try
+        {
+            var choices = new List<OutputChoice> { new(null, "Windows default output") };
+            choices.AddRange(snapshot.Devices.Select(d => new OutputChoice(d.Id, d.Name)));
+            if (settings.AudioEndpointId is { } id && choices.All(d => d.Id != id))
+                choices.Add(new(id, settings.AudioDeviceName));
+            var old = speakers.Items.Cast<OutputChoice>().ToArray();
+            if (!old.SequenceEqual(choices))
+            {
+                speakers.BeginUpdate();
+                try { speakers.Items.Clear(); speakers.Items.AddRange(choices.Cast<object>().ToArray()); }
+                finally { speakers.EndUpdate(); }
+            }
+            speakers.SelectedItem = speakers.Items.Cast<OutputChoice>().First(d => d.Id == settings.AudioEndpointId);
+        }
+        finally { updatingOutputs = false; }
+    }
     private void OpenWindow() { ShowInTaskbar = true; Show(); WindowState = FormWindowState.Normal; Activate(); }
     private static Button Button(string text) => new() { Text = text, AutoSize = true, Height = 35, Padding = new Padding(12, 5, 12, 5), FlatStyle = FlatStyle.Flat, Margin = new Padding(0, 0, 10, 0) };
     private static void Add(TableLayoutPanel layout, Control control, int height) { var row = layout.Controls.Count; layout.Controls.Add(control, 0, row); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height)); }
@@ -202,8 +250,10 @@ public sealed class MainForm : Form
     {
         if (!IPAddress.TryParse(network.Text.Trim(), out var address) || address.AddressFamily != AddressFamily.InterNetwork || address.Equals(IPAddress.Any)) throw new ArgumentException("Enter this PC's IPv4 address.");
         monitorGrid.EndEdit(); settings.BindAddress = address.ToString(); settings.SwitchDisplays = displays.Checked;
-        settings.AudioDevice = ((AudioDevice)speakers.SelectedItem!).Id;
-        settings.AudioDeviceName = ((AudioDevice)speakers.SelectedItem!).Name;
+        var audioChoice = (OutputChoice)speakers.SelectedItem!;
+        settings.AudioEndpointId = audioChoice.Id;
+        settings.AudioDevice = audioChoice.Id is null ? -1 : 0;
+        settings.AudioDeviceName = audioChoice.Name;
         settings.Monitors = monitorGrid.Rows.Cast<DataGridViewRow>().Select((r, i) => new MonitorRoute(detected[i].Id, Convert.ToUInt32(r.Cells["PC"].Value), Convert.ToUInt32(r.Cells["Mac"].Value))).ToList();
         if (settings.SwitchDisplays && (settings.Monitors.Count == 0 || settings.Monitors.Any(x => x.PcInput == x.MacInput))) throw new ArgumentException("Each monitor needs different PC and Mac inputs.");
         settings.Save();
@@ -213,12 +263,15 @@ public sealed class MainForm : Form
         Save();
         try
         {
-            player = new AudioPlayer(settings.AudioDevice);
-            StartupTrace.Write("Audio playback: " + player.Backend);
+            var audio = new AudioOutput(settings.AudioEndpointId);
+            player = audio;
+            audio.StatusChanged += message => UI(() => { if (player == audio) { audioVerified = false; Note(message); } });
+            audio.DevicesChanged += snapshot => UI(() => { if (player == audio) RefreshAudioChoices(snapshot); });
+            audio.Start();
             server = new BridgeServer(settings.BindAddress, settings.Port, identity);
             server.Status += message => UI(() => Note(message));
             server.ReturnToWindowsRequested += () => UI(() => RequestSwitch(Computer.PC));
-            server.Audio += bytes => { try { player?.Push(bytes); } catch (Exception e) { UI(() => Note(e.Message)); } };
+            server.Audio += bytes => player?.Push(bytes);
             server.ConnectionChanged += connected => UI(() => {
                 StartupTrace.Write($"Mac connection changed: connected={connected}");
                 connection.Text = connected ? "Mac connected · encrypted" : "Waiting for your Mac";
@@ -229,7 +282,7 @@ public sealed class MainForm : Form
                 Shortcut = target => BeginInvoke(() => RequestSwitch(target)),
                 Overflow = () => BeginInvoke(() => { Note("Input connection stalled; returning to PC."); RequestSwitch(Computer.PC); server?.Disconnect(); }) };
             server.Start(); start.Text = "Stop connection"; connection.Text = "Waiting for your Mac";
-            network.Enabled = speakers.Enabled = displays.Enabled = monitorGrid.Enabled = false;
+            network.Enabled = displays.Enabled = monitorGrid.Enabled = false;
             Note($"Listening on {settings.BindAddress}:{settings.Port}. Paste the pairing code into the Mac app.");
         }
         catch { await Stop(); throw; }
@@ -316,7 +369,8 @@ public sealed class MainForm : Form
             try { if (server.Connected) { try { await server.CommandAsync("deactivate"); } catch { } } await server.DisposeAsync(); server = null; }
             finally { transition.Release(); }
         }
-        input?.Dispose(); input = null; player?.Dispose(); player = null;
+        input?.Dispose(); input = null;
+        var audio = player; player = null; if (audio is not null) await audio.DisposeAsync();
         if (settings.SwitchDisplays) await RestoreDisplays();
         ShowTarget(false); swap.Enabled = false; start.Text = "Start connection"; connection.Text = "Connection stopped";
         network.Enabled = speakers.Enabled = displays.Enabled = monitorGrid.Enabled = true; SetThreadExecutionState(0x80000000u);

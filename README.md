@@ -89,8 +89,14 @@ Protected-video playback worked in one live setup after replacing the old
 screen-capture audio method, but behavior is not guaranteed across apps,
 content, macOS versions or permissions. Bluetooth headphones can add substantial
 delay after Windows playback; the network and software buffer sizes are not a
-guarantee of end-to-end latency. Changing the Windows default output during an
-active stream currently requires restarting the TwinDesk connection.
+guarantee of end-to-end latency.
+
+With **Windows default output** selected, TwinDesk follows changes to the Windows
+playback device automatically. You can also change TwinDesk's speaker selection
+while connected. If an explicitly selected device disconnects, TwinDesk waits
+for that device and retries playback; it does not redirect sound to another
+output. Recovery discards old audio and leaves the connection, keyboard/mouse,
+and monitor inputs alone. A device change can cause a brief audio gap.
 
 ## Startup, storage and troubleshooting
 

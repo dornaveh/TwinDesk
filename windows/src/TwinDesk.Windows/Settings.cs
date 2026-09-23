@@ -11,6 +11,7 @@ public sealed class Settings
     public int Port { get; set; } = 48150;
     public int AudioDevice { get; set; } = -1;
     public string AudioDeviceName { get; set; } = "Windows default output";
+    public string? AudioEndpointId { get; set; }
     public bool SwitchDisplays { get; set; }
     public List<MonitorRoute> Monitors { get; set; } = [];
     public static string DataDirectory { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TwinDesk");

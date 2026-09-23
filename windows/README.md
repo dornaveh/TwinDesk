@@ -74,8 +74,20 @@ firewall rules. Applying it keeps the files and Ethernet configuration.
 
 ## Audio
 
-Choose an output before starting the connection. Shared WASAPI allows Windows
-and Mac audio together; compatible output formats use IAudioClient3's supported
-minimum period. A 40 ms maximum application queue discards old frames after a
-burst, without intentionally waiting to fill it. Current audio-device changes
-require stopping and restarting the connection. Bluetooth delay is separate.
+Select **Windows default output** to have Mac audio follow the current Windows
+playback device, including changes between speakers and headphones. The output
+selector also works while connected. Explicit device selections are remembered
+by endpoint identity, so similarly named devices are not interchangeable.
+
+If an output disconnects or its format changes, TwinDesk reopens playback with
+bounded retry delays. An explicitly selected device must return before playback
+resumes; TwinDesk does not silently switch to another device. If no output is
+available, incoming audio is discarded until one becomes available. The status
+shows recovery without repeating an error for every audio packet. Keyboard,
+mouse, monitor control, and the encrypted connection stay active.
+
+Shared WASAPI allows Windows and Mac audio together; compatible output formats
+use IAudioClient3's supported minimum period. A 40 ms maximum application queue
+discards old frames after a burst, without intentionally waiting to fill it.
+Recovery clears queued audio instead of replaying stale sound. Brief gaps while
+a device opens are expected; Bluetooth adds its own delay.
