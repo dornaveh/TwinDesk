@@ -12,7 +12,7 @@ make -C third_party/m1ddc
 cp third_party/m1ddc/m1ddc "$OUT/Contents/Helpers/display-control"
 cp third_party/m1ddc/LICENSE "$OUT/Contents/Resources/Monitor-component-LICENSE.txt"
 xcrun swiftc -swift-version 5 -parse-as-library -O -target arm64-apple-macosx14.2 \
-  TwinDesk/*.swift Shared/*.swift -o "$OUT/Contents/MacOS/TwinDesk" \
+  TwinDesk/*.swift -o "$OUT/Contents/MacOS/TwinDesk" \
   -framework SwiftUI -framework AppKit -framework Foundation -framework Network \
   -framework CoreAudio \
   -framework CoreGraphics -framework Security -framework CryptoKit
