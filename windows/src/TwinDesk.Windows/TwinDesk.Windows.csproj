@@ -10,7 +10,6 @@
     <Version>0.1.0</Version>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../TwinDesk.Core/TwinDesk.Core.csproj" /></ItemGroup>
-  <ItemGroup><InternalsVisibleTo Include="TwinDesk.Tests" /></ItemGroup>
   <ItemGroup>
     <Content Include="../../third_party/naudio/LICENSE.txt" Link="licenses/NAudio-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../third_party/dotnet-tensors/*.TXT" Link="licenses/dotnet-tensors/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

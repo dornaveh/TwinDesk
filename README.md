@@ -94,9 +94,8 @@ active stream currently requires restarting the TwinDesk connection.
 
 ## Startup, storage and troubleshooting
 
-- [Windows setup, optional Ethernet/SMB sharing, startup and tests](windows/README.md)
-- [Mac build, permissions, startup and audio test](mac/README.md)
-- [Implementation and validation notes](windows/docs/VALIDATION.md)
+- [Windows setup, optional Ethernet/SMB sharing and startup](windows/README.md)
+- [Mac build, permissions, audio and startup](mac/README.md)
 
 Monitor input reads can fail even while the display picture is fine. “Not
 reported” means a control query failed; it does not prove the screen is absent.
@@ -105,9 +104,9 @@ DDC success is not proof that the displayed picture changed.
 
 ## Repository layout and privacy
 
-`windows/` contains the Windows host, shared wire-format code, console checks,
-build/setup tools and dependency notices. `mac/` contains the companion,
-audio-only test utility, build scripts and the Apple Silicon display helper.
+`windows/` contains the Windows app, shared wire-format code, build/install
+scripts and dependency notices. `mac/` contains the Mac app, its audio
+components, build/install scripts and the bundled Apple Silicon display helper.
 
 The PC creates a local certificate and random pairing token. The Mac pins the
 certificate; pairing state is protected with Windows DPAPI and Mac Keychain.

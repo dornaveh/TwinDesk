@@ -60,15 +60,4 @@ launchctl bootout "gui/$(id -u)/local.twindesk.login"
 rm "$HOME/Library/LaunchAgents/local.twindesk.login.plist"
 ```
 
-## Developer checks
-
-Build the optional audio-only diagnostic app with `bash mac/AudioTapTest/Build.command`. It uses the same audio tap and TLS connection, rejects input/display activation, and should be used with the main app disconnected. Building it does not launch it.
-
-Run the PCM conversion checks without opening either app:
-
-```sh
-xcrun swiftc mac/Shared/TapPCM.swift mac/AudioTapTest/tests/main.swift -o /tmp/twindesk-pcm-tests
-/tmp/twindesk-pcm-tests
-```
-
 The vendored display helper's license, source checksums, and revision are in `third_party/m1ddc/`. Do not infer monitor-control reliability from successful compilation or clear video; DDC support varies with monitor, adapter, and active input.

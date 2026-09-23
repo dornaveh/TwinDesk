@@ -79,34 +79,3 @@ and Mac audio together; compatible output formats use IAudioClient3's supported
 minimum period. A 40 ms maximum application queue discards old frames after a
 burst, without intentionally waiting to fill it. Current audio-device changes
 require stopping and restarting the connection. Bluetooth delay is separate.
-
-## Tests and diagnostics
-
-From the repository root:
-
-```powershell
-dotnet run -c Release --project windows/tests/TwinDesk.Tests/TwinDesk.Tests.csproj
-```
-
-This is a console test runner, not `dotnet test`. It exercises framing,
-authenticated loopback TLS, pairing persistence, allowlisted Mac return
-requests, disconnect behavior, key normalization and shortcut capture,
-monitor-route mocks, and bounded PCM queue behavior. It creates disposable
-identity data under the working directory's ignored `local-data` folder.
-It does not install keyboard hooks or switch actual monitors.
-
-Optional real silent playback checks (requires a working Windows audio output):
-
-```powershell
-dotnet run -c Release --project windows/tests/TwinDesk.Tests/TwinDesk.Tests.csproj -- --hardware-audio
-```
-
-`TwinDesk.exe --diagnose <output.json>` reads monitor/audio device information.
-Diagnostic output may include device identifiers: inspect it before sharing.
-`Probe-Monitors.ps1`, `Probe-DisplayModes.ps1` and `Test-NvidiaDdc.ps1` are read-only
-hardware probes; the NVIDIA probe requires that driver. DDC capability queries
-can stall on some monitors. `Set-MonitorsInput.ps1` is an advanced mutating
-diagnostic for the tested Samsung codes; it requires an explicit target UID.
-Do not run monitor probes concurrently with a switch.
-
-See [validation and limitations](docs/VALIDATION.md) for the current evidence.
