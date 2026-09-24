@@ -34,7 +34,7 @@ public sealed class MainForm : Form
     private long previousAudio;
     private CancellationTokenSource? operation;
 
-    public MainForm(bool startInTray = false)
+    public MainForm(bool startInTray = false, bool autoConnect = false)
     {
         if (startInTray) StartupTrace.Write("form construction started");
         this.startInTray = startInTray;
@@ -107,6 +107,7 @@ public sealed class MainForm : Form
         menu.Items.Add("Quit TwinDesk", null, async (_, _) => { await Stop(); quitting = true; Close(); });
         tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "TwinDesk · PC", ContextMenuStrip = menu, Visible = true };
         tray.DoubleClick += (_, _) => OpenWindow();
+        tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) OpenWindow(); };
         start.Click += async (_, _) => { try { if (server is null) await Start(); else await Stop(); } catch (Exception e) { Note(e.Message); } };
         swap.Click += (_, _) => RequestSwitch(null);
         recover.Click += async (_, _) => { RequestSwitch(Computer.PC); if (server is null) await RestoreDisplays(); };
@@ -140,9 +141,9 @@ public sealed class MainForm : Form
         Microsoft.Win32.SystemEvents.PowerModeChanged += PowerChanged;
         Shown += async (_, _) => {
             if (startInTray) StartupTrace.Write("shown");
-            if (startInTray)
+            if (startInTray || autoConnect)
             {
-                Hide();
+                if (startInTray) Hide();
                 // Never gate reconnection on DDC/CI: a monitor may take a long time
                 // to answer (or never answer) after Windows starts.
                 LoadSavedMonitors();
@@ -189,7 +190,15 @@ public sealed class MainForm : Form
         }
         finally { updatingOutputs = false; }
     }
-    private void OpenWindow() { ShowInTaskbar = true; Show(); WindowState = FormWindowState.Normal; Activate(); }
+    internal void OpenWindow()
+    {
+        ShowInTaskbar = true; Show(); WindowState = FormWindowState.Normal;
+        // Display topology can change while hidden. Keep the title bar reachable.
+        var area = Screen.FromRectangle(Bounds).WorkingArea;
+        Location = new Point(Math.Clamp(Left, area.Left, Math.Max(area.Left, area.Right - Width)),
+            Math.Clamp(Top, area.Top, Math.Max(area.Top, area.Bottom - Height)));
+        Activate();
+    }
     private static Button Button(string text) => new() { Text = text, AutoSize = true, Height = 35, Padding = new Padding(12, 5, 12, 5), FlatStyle = FlatStyle.Flat, Margin = new Padding(0, 0, 10, 0) };
     private static void Add(TableLayoutPanel layout, Control control, int height) { var row = layout.Controls.Count; layout.Controls.Add(control, 0, row); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height)); }
     private static void Style(Control parent)

@@ -22,5 +22,14 @@ $principal = New-ScheduledTaskPrincipal -UserId $account -LogonType Interactive 
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
 $taskName = 'TwinDesk-' + $env:USERNAME
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Start TwinDesk in the tray at sign-in and reconnect to the Mac.' -Force | Out-Null
+# Interactive launches open the window; only the sign-in task uses --startup.
+$shortcutPath = Join-Path ([Environment]::GetFolderPath('Programs')) 'TwinDesk.lnk'
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut($shortcutPath)
+$shortcut.TargetPath = $exe
+$shortcut.Arguments = '--data "' + $data + '"'
+$shortcut.WorkingDirectory = Split-Path $exe
+$shortcut.IconLocation = $exe + ',0'
+$shortcut.Save()
 Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name TwinDesk -ErrorAction SilentlyContinue
 Write-Output "Registered $taskName. Settings: $data"

@@ -19,9 +19,12 @@ internal static class Program
         }
         var startInTray = Array.IndexOf(args, "--startup") >= 0;
         if (startInTray) StartupTrace.Write("launch");
+        // Create before the mutex so a launch during initialization cannot lose
+        // its open request. AutoReset retains that request until the UI is ready.
+        using var openRequest = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\TwinDesk-" + Environment.UserName + "-Open");
         using var instance = new Mutex(true, "Local\\TwinDesk-" + Environment.UserName, out var first);
         if (startInTray) StartupTrace.Write($"mutex first={first}");
-        if (!first) { MessageBox.Show("TwinDesk is already running. Open it from the system tray.", "TwinDesk"); return; }
+        if (!first) { if (!startInTray) openRequest.Set(); return; }
         ApplicationConfiguration.Initialize();
         if (startInTray) StartupTrace.Write("winforms initialized");
         var preview = Array.IndexOf(args, "--render-preview");
@@ -36,7 +39,16 @@ internal static class Program
             form.DrawToBitmap(bitmap, new Rectangle(0, 0, form.Width, form.Height));
             bitmap.Save(args[preview + 1]); form.Close(); return;
         }
-        try { Application.Run(new MainForm(startInTray)); }
+        try
+        {
+            using var form = new MainForm(startInTray, autoConnect: true);
+            // Poll on the UI thread: no cross-thread callbacks after form disposal,
+            // and opening the window never starts a monitor scan or switches input.
+            using var activation = new System.Windows.Forms.Timer { Interval = 200 };
+            activation.Tick += (_, _) => { if (openRequest.WaitOne(0)) form.OpenWindow(); };
+            form.Shown += (_, _) => activation.Start();
+            Application.Run(form);
+        }
         catch (Exception e) { MessageBox.Show(e.Message, "TwinDesk could not start", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
 }
