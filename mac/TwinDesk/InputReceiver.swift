@@ -4,6 +4,7 @@ import CoreGraphics
 final class InputReceiver {
     private var keys = Set<CGKeyCode>()
     private var buttons = Set<Int>()
+    private var navigationButtons = Set<Int>()
     private var point = CGPoint.zero
     private var clicks: [Int: (Double, CGPoint, Int64)] = [:]
     private var caps = false
@@ -58,6 +59,17 @@ final class InputReceiver {
             event?.flags = flags; event?.post(tap: .cghidEventTap)
         case "button":
             guard let button = p["button"] as? Int, (0...4).contains(button), let down = p["down"] as? Bool else { throw BridgeError.message("Invalid pointer button.") }
+            // Windows XBUTTON1/2 mean Back/Forward. Raw otherMouse events do not
+            // consistently navigate on macOS; use the standard Command-[ / ] shortcuts.
+            // Keep these out of the drag state and trigger only once per press.
+            if button >= 3 {
+                if down {
+                    if navigationButtons.insert(button).inserted { postNavigation(button) }
+                } else {
+                    navigationButtons.remove(button)
+                }
+                return
+            }
             if down { buttons.insert(button) } else { buttons.remove(button) }
             let now = ProcessInfo.processInfo.systemUptime
             if down {
@@ -79,8 +91,17 @@ final class InputReceiver {
         let event = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: CGMouseButton(rawValue: UInt32(b))!)
         event?.flags = flags; event?.setIntegerValueField(.mouseEventClickState, value: count); event?.post(tap: .cghidEventTap)
     }
+    private func postNavigation(_ button: Int) {
+        let key: CGKeyCode = button == 3 ? 33 : 30
+        for down in [true, false] {
+            let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down)
+            event?.flags = [.maskCommand]
+            event?.post(tap: .cghidEventTap)
+        }
+    }
     func releaseAll() {
         active = false
+        navigationButtons.removeAll()
         let pressed = keys; keys.removeAll()
         for key in pressed { let e = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false); e?.flags = flags; e?.post(tap: .cghidEventTap) }
         for b in buttons { postButton(b, false, 1) }

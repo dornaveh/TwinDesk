@@ -19,6 +19,13 @@ toggles, Ctrl+Alt+F10 selects Mac, and Ctrl+Alt+F11 returns local input to PC.
 Monitor routing must match actual cables. Refresh reads the monitor list while
 connected without changing input or ending the connection.
 
+Double-clicking the physical middle mouse button also toggles computers. A
+single middle click waits for the Windows double-click recognition window;
+middle dragging starts when movement exceeds the click tolerance. Mouse buttons
+and pending clicks are released or discarded when changing targets. Injected
+mouse events do not trigger the shortcut. Mac Back/Forward buttons map to
+Command-[ and Command-] in apps supporting those navigation shortcuts.
+
 After building and testing, optionally run:
 
 ```powershell

@@ -48,7 +48,7 @@ public sealed class MainForm : Form
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         Add(layout, new Label { Text = "T W I N D E S K   /   P R E V I E W", AutoSize = true, ForeColor = Color.FromArgb(113, 211, 196) }, 30);
         Add(layout, active, 54); Add(layout, connection, 30);
-        Add(layout, new Label { Text = "Ctrl + Alt + F12  Switch computers     ·     Ctrl + Alt + F11  Return to PC", AutoSize = true }, 36);
+        Add(layout, new Label { Text = "Double middle-click / Ctrl + Alt + F12: switch     ·     Ctrl + Alt + F11: PC", AutoSize = true }, 36);
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
         var recover = Button("Restore PC displays");
         actions.Controls.AddRange([start, swap, recover]); swap.Enabled = false;

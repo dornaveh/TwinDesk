@@ -64,6 +64,7 @@ cloning or building this repository.
 | Action | Windows shortcut |
 | --- | --- |
 | Switch computers | Ctrl + Alt + F12 |
+| Switch computers with the mouse | Double-click the physical middle button |
 | Return keyboard and mouse to Windows | Ctrl + Alt + F11 |
 | Select the Mac | Ctrl + Alt + F10 |
 
@@ -71,6 +72,14 @@ The Mac menu also has **Switch back to Windows**. Windows key maps to Command,
 Alt to Option, and Ctrl to Control. Keyboard forwarding uses physical key
 positions interpreted by the Mac's selected layout. Some keyboards require
 their Fn key to produce F10–F12.
+
+Double-middle-click uses Windows' configured double-click time and movement
+tolerance. Single middle clicks are delayed by that recognition window; middle
+dragging starts as soon as movement exceeds the tolerance. Rapid extra clicks
+do not immediately toggle back. The gesture works on either computer while
+TwinDesk is connected and uses the same monitor-switching setting as the keyboard
+shortcut. On the Mac, mouse Back/Forward buttons send Command-[ and Command-]
+for apps supporting those navigation shortcuts.
 
 ## Audio and muting
 
