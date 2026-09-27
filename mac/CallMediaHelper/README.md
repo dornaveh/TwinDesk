@@ -26,9 +26,10 @@ zsh "mac/Install-Login-Startup.command"
 
 The audio-driver installer asks for a Mac administrator password because Core
 Audio drivers live under `/Library/Audio/Plug-Ins/HAL`. A locally installed
-Apple Development signing identity is required to build that driver. The app
-build can otherwise use its default ad-hoc signature, though changed ad-hoc
-builds may make macOS ask for permissions again.
+Apple Development signing identity is required to build that driver and is
+automatically used for both apps when available. App builds fall back to ad-hoc
+signing when no identity exists, which may make macOS ask for permissions again
+after an update.
 
 Open Windows TwinDesk's **Camera & mic** controls, select the webcam and its
 microphone, and enable sharing. Copy its media setup code into **Camera &

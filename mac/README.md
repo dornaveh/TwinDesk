@@ -24,7 +24,12 @@ script opens Finder at the result; set `TWINDESK_NO_REVEAL=1` to skip that. If
 Command Line Tools are missing, it requests Apple's installer and exits; finish
 installation before rebuilding.
 
-The default signature is ad hoc. Set `TWINDESK_SIGNING_IDENTITY` to your own installed code-signing identity for consistent signing across builds. This does not automatically notarize the app or guarantee that permissions survive every update. Never distribute signing keys or pairing codes.
+The build uses an installed Apple Development signing identity when one is
+available; set `TWINDESK_SIGNING_IDENTITY` to choose one explicitly. The audio
+driver requires such an identity. The two apps fall back to ad-hoc signing when
+no identity is found, which can make macOS request permissions again after an
+update. Local signing does not notarize the apps. Never distribute signing keys
+or pairing codes.
 
 ## Install, permissions, and pairing
 

@@ -11,7 +11,7 @@ cp Info.plist "$OUT/Contents/Info.plist"
 cp LEMURCAM-LICENSE.md "$OUT/Contents/Resources/LemurCam-LICENSE.txt"
 
 SIGNING_IDENTITY="${TWINDESK_SIGNING_IDENTITY:-}"
-if [[ -z "$SIGNING_IDENTITY" ]]; then
+if [[ -z "$SIGNING_IDENTITY" || "$SIGNING_IDENTITY" == "-" ]]; then
   SIGNING_IDENTITY="$(security find-identity -v -p codesigning | awk '/Apple Development/ {print $2; exit}')"
 fi
 if [[ -z "$SIGNING_IDENTITY" ]]; then

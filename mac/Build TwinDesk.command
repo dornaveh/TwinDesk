@@ -17,15 +17,19 @@ xcrun swiftc -swift-version 5 -parse-as-library -O -target arm64-apple-macosx14.
   -framework CoreAudio \
   -framework CoreGraphics -framework Security -framework CryptoKit
 cp Info.plist "$OUT/Contents/Info.plist"
-SIGNING_IDENTITY="${TWINDESK_SIGNING_IDENTITY:--}"
+SIGNING_IDENTITY="${TWINDESK_SIGNING_IDENTITY:-}"
+if [[ -z "$SIGNING_IDENTITY" ]]; then
+  SIGNING_IDENTITY="$(security find-identity -v -p codesigning | awk '/Apple Development/ {print $2; exit}')"
+fi
+SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 if [[ "$SIGNING_IDENTITY" == "-" ]]; then
   echo "WARNING: Ad-hoc builds change app identity. Re-authorize Accessibility and screen/audio capture after installing each changed build."
   echo "Set TWINDESK_SIGNING_IDENTITY to a stable code-signing identity to preserve identity across builds."
 fi
 codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$OUT/Contents/Helpers/display-control"
 codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$OUT"
-bash "AudioDriver/Build.command"
-bash "CallMediaHelper/Build.command"
+TWINDESK_SIGNING_IDENTITY="$SIGNING_IDENTITY" bash "AudioDriver/Build.command"
+TWINDESK_SIGNING_IDENTITY="$SIGNING_IDENTITY" bash "CallMediaHelper/Build.command"
 echo "Built: $OUT"
 echo "Install TwinDesk.app and TwinDesk-Calls.app into Applications, then run AudioDriver/Install.command once. The helper runs behind the single TwinDesk menu."
 if [[ "${TWINDESK_NO_REVEAL:-0}" != "1" ]]; then open -R "$OUT"; fi

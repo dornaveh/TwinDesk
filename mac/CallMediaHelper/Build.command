@@ -14,6 +14,10 @@ xcrun swiftc -swift-version 5 -parse-as-library -O -target arm64-apple-macosx14.
   -framework CryptoKit -framework CoreMediaIO -framework CoreMedia -framework CoreVideo \
   -framework ImageIO -framework CoreGraphics -framework CoreAudio -framework AudioToolbox
 cp Info.plist "$OUT/Contents/Info.plist"
-codesign --force --sign "${TWINDESK_SIGNING_IDENTITY:--}" --timestamp=none "$OUT"
+SIGNING_IDENTITY="${TWINDESK_SIGNING_IDENTITY:-}"
+if [[ -z "$SIGNING_IDENTITY" ]]; then
+  SIGNING_IDENTITY="$(security find-identity -v -p codesigning | awk '/Apple Development/ {print $2; exit}')"
+fi
+codesign --force --sign "${SIGNING_IDENTITY:--}" --timestamp=none "$OUT"
 codesign --verify --deep --strict "$OUT"
 echo "Built $OUT (not installed)."
