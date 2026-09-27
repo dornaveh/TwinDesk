@@ -39,6 +39,10 @@ It accepts `--startup` to hide its initial window. The helper runs without a men
 speaker forwarding is automatic while the helper runs. Keep the regular TwinDesk
 app running as well.
 
+Forwarded speaker audio follows the Mac output device's volume and mute controls.
+The helper applies the device's reported volume gain to the captured audio before
+sending it to Windows; Windows playback volume still applies separately.
+
 In the Mac calling app choose:
 
 - **Camera:** OBS Virtual Camera

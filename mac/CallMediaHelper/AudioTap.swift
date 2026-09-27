@@ -11,6 +11,7 @@ final class AudioTap {
     private var device: AudioObjectID = 0
     private var io: AudioDeviceIOProcID?
     private let queue = DispatchQueue(label: "TwinDesk.core-audio")
+    private lazy var outputVolume = OutputVolume(queue: queue)
     private var lastReport = 0.0
     var meter: ((Double) -> Void)?
     var send: ((Data) -> Void)?
@@ -33,6 +34,7 @@ final class AudioTap {
             guard outputUID as String != "BlackHole2ch_UID" else {
                 throw TapFailure(message: "Keep Mac speakers as the system output; BlackHole 2ch is only the microphone for calls.")
             }
+            outputVolume.start(device: output)
             var pid = getpid()
             var process = AudioObjectID(0)
             var size = UInt32(MemoryLayout<AudioObjectID>.size)
@@ -75,10 +77,10 @@ final class AudioTap {
                     let samples = data.assumingMemoryBound(to: Float.self)
                     for index in 0..<(Int(buffer.mDataByteSize) / MemoryLayout<Float>.size) {
                         let sample = samples[index]
-                        if sample.isFinite { peak = max(peak, abs(sample)) }
+                        if sample.isFinite { peak = max(peak, abs(sample * self.outputVolume.gain)) }
                     }
                 }
-                if let data = TapPCM.encode(buffers) {
+                if let data = TapPCM.encode(buffers, gain: self.outputVolume.gain) {
                     for offset in stride(from: 0, to: data.count, by: 1920) {
                         self.send?(data.subdata(in: offset..<min(offset + 1920, data.count)))
                     }
@@ -98,6 +100,7 @@ final class AudioTap {
         io = nil
         if device != 0 { AudioHardwareDestroyAggregateDevice(device); device = 0 }
         if tap != 0 { AudioHardwareDestroyProcessTap(tap); tap = 0 }
+        outputVolume.stop()
     }
     deinit { stop() }
 }
