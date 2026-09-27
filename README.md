@@ -25,7 +25,9 @@ FileVault unlock, recovery, or protected Windows desktops.
 - Optionally sends a PC webcam and microphone to Mac calling apps through the
   [TwinDesk Calls helper](mac/CallMediaHelper/README.md). Camera modes are
   1280×720 requesting 30 fps and 1920×1080 requesting 15 fps. The tested USB
-  camera delivered about 15 fps in both modes; selecting 30 fps does not guarantee it.
+  camera delivered about 15 fps in both modes; selecting 30 fps does not
+  guarantee it. OBS Virtual Camera supplies video and the bundled TwinDesk
+  Microphone driver supplies audio.
 
 ## Requirements and cables
 
@@ -42,7 +44,8 @@ FileVault unlock, recovery, or protected Windows desktops.
 
 1. On Windows, run `powershell -NoProfile -File windows/tools/Build-Windows.ps1`.
    Open `windows/dist/TwinDesk-Windows/TwinDesk.exe`.
-2. Build and install the main companion and its background Calls helper using
+2. Build and install the main companion, its background Calls helper, and the
+   TwinDesk Microphone driver using
    [mac/README.md](mac/README.md). Grant Accessibility to the main app for input
    control and system-audio recording to the helper when macOS asks.
    Install before granting permissions: replacing

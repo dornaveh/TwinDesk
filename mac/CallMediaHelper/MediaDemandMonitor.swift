@@ -13,19 +13,19 @@ final class MediaDemandMonitor {
         guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &result) == noErr else { return [] }
         return Array(result.prefix(Int(size / 4)))
     }
-    private func isBlackHole(_ device: AudioObjectID) -> Bool {
+    private func isTwinDeskMicrophone(_ device: AudioObjectID) -> Bool {
         var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyDeviceUID,
             mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
         var uid: Unmanaged<CFString>?
         var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &uid) == noErr, let uid else { return false }
-        return uid.takeRetainedValue() as String == "BlackHole2ch_UID"
+        return uid.takeRetainedValue() as String == "local.twindesk.microphone"
     }
     func microphoneInUse() -> Bool {
         for process in values(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyProcessObjectList) {
             guard values(process, kAudioProcessPropertyPID).first != UInt32(getpid()),
                   values(process, kAudioProcessPropertyIsRunningInput).first == 1 else { continue }
-            if values(process, kAudioProcessPropertyDevices, scope: kAudioObjectPropertyScopeInput).contains(where: isBlackHole) { return true }
+            if values(process, kAudioProcessPropertyDevices, scope: kAudioObjectPropertyScopeInput).contains(where: isTwinDeskMicrophone) { return true }
         }
         return false
     }

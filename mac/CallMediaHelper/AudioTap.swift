@@ -31,8 +31,8 @@ final class AudioTap {
             try read(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultOutputDevice, into: &output)
             var outputUID: CFString = "" as CFString
             try read(output, kAudioDevicePropertyDeviceUID, into: &outputUID)
-            guard outputUID as String != "BlackHole2ch_UID" else {
-                throw TapFailure(message: "Keep Mac speakers as the system output; BlackHole 2ch is only the microphone for calls.")
+            guard outputUID as String != "local.twindesk.microphone" else {
+                throw TapFailure(message: "Keep Mac speakers as the system output; TwinDesk Microphone is only for call input.")
             }
             outputVolume.start(device: output)
             var pid = getpid()

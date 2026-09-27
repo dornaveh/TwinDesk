@@ -14,13 +14,25 @@ From the repository root:
 bash "mac/Build TwinDesk.command"
 ```
 
-The script builds `mac/dist/TwinDesk.app`, the bundled m1ddc display helper, and `mac/CallMediaHelper/dist/TwinDesk-Calls.app`. Install both apps: the background Calls helper handles system audio and optional camera/microphone forwarding. See its [setup instructions](CallMediaHelper/README.md) for media dependencies. The script opens Finder at the result; set `TWINDESK_NO_REVEAL=1` to skip that. If Command Line Tools are missing, it requests Apple's installer and exits; finish installation before rebuilding.
+The script builds `mac/dist/TwinDesk.app`, the bundled m1ddc display helper,
+`mac/CallMediaHelper/dist/TwinDesk-Calls.app`, and the TwinDesk Microphone audio
+driver. Install both apps and install the driver once using
+`mac/AudioDriver/Install.command`. The background Calls helper handles system
+audio and optional camera/microphone forwarding. See its
+[setup instructions](CallMediaHelper/README.md) for media dependencies. The
+script opens Finder at the result; set `TWINDESK_NO_REVEAL=1` to skip that. If
+Command Line Tools are missing, it requests Apple's installer and exits; finish
+installation before rebuilding.
 
 The default signature is ad hoc. Set `TWINDESK_SIGNING_IDENTITY` to your own installed code-signing identity for consistent signing across builds. This does not automatically notarize the app or guarantee that permissions survive every update. Never distribute signing keys or pairing codes.
 
 ## Install, permissions, and pairing
 
-1. Copy the built apps to `/Applications/TwinDesk.app` and `/Applications/TwinDesk-Calls.app` before granting permissions. Quit previous copies before replacing them. Have local Mac input available during setup or permission changes.
+1. Install TwinDesk Microphone with `mac/AudioDriver/Install.command`, then copy
+   the built apps to `/Applications/TwinDesk.app` and
+   `/Applications/TwinDesk-Calls.app` before granting permissions. Quit previous
+   copies before replacing them. Have local Mac input available during setup or
+   permission changes.
 2. Open the installed app and allow Accessibility access when requested, so it can inject keyboard and mouse events. Newer macOS versions may group this under Device Control and Data Access.
 3. Allow local-network access if macOS asks. Paste the pairing code from your Windows companion and connect. Pairing pins the PC certificate and saves the pairing secret in the Mac Keychain.
 4. Open **Camera & microphone settings…** from the TwinDesk menu, pair the helper using the separate media setup code from Windows **Camera & mic**, and approve its system-audio recording access. Audio forwards automatically; camera and microphone permissions are independent and optional. Depending on macOS, the audio permission appears under Screen & System Audio Recording. The helper uses a Core Audio process tap and does not capture screen images.
@@ -31,7 +43,11 @@ Ad hoc rebuilds can require granting permissions again. If input is unavailable 
 
 Use the Windows shortcuts documented in the root README. The Mac menu-bar dropdown also offers **Switch back to Windows** when connected to a compatible Windows companion. Monitor switching is requested through Windows during normal operation; Mac display-helper support remains experimental and connection-dependent.
 
-Use **Start camera feed / Stop camera feed** in the same TwinDesk menu. The camera defaults off on launch and after sleep. Enable **Use PC microphone automatically** to forward the microphone only while a Mac app uses BlackHole 2ch. Calling apps select OBS Virtual Camera and BlackHole 2ch. OBS and BlackHole are optional for speaker-only use.
+Use **Start camera feed / Stop camera feed** in the same TwinDesk menu. The
+camera defaults off on launch and after sleep. **Use PC microphone automatically**
+forwards the PC webcam microphone while a Mac app uses TwinDesk Microphone.
+Calling apps select OBS Virtual Camera and TwinDesk Microphone. OBS and the
+TwinDesk audio driver are optional for speaker-only use.
 
 The Windows key becomes Command; Alt becomes Option. Both Shift keys should work. Input switching and audio forwarding are independent. The helper has no separate menu icon and is launched by the main app.
 
@@ -53,7 +69,14 @@ After building and quitting any running installed TwinDesk app:
 zsh "mac/Install-Login-Startup.command"
 ```
 
-This verifies and copies both builds into `/Applications`, backs up existing installations under `mac/previous-install`, and registers `~/Library/LaunchAgents/local.twindesk.login.plist` for the current user. Both apps must be closed before installation. It opens TwinDesk at graphical sign-in, not before login; TwinDesk launches the installed helper. Both can reconnect using their saved pairing. Installing a changed ad hoc build may require granting permissions again.
+This verifies and copies both app builds into `/Applications`, verifies the
+already installed audio driver, backs up existing app installations under
+`mac/previous-install`, and registers
+`~/Library/LaunchAgents/local.twindesk.login.plist` for the current user. Both
+apps must be closed before installation. It opens TwinDesk at graphical sign-in,
+not before login; TwinDesk launches the installed helper. Both can reconnect
+using their saved pairing. Installing a changed ad hoc build may require granting
+permissions again.
 
 To remove automatic startup, unload the agent and remove its plist:
 

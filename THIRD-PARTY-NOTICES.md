@@ -17,10 +17,12 @@ No project-wide license has been selected for TwinDesk's own code.
 Windows publish output contains its dependency license files. The Mac build
 includes the m1ddc license in the app bundle.
 
-The optional Mac Calls helper uses two separately installed components. Their
-binaries are not redistributed in this repository:
+The optional Mac Calls helper uses OBS Virtual Camera, which is installed
+separately and is not redistributed in this repository:
 
 - **OBS Studio / OBS Virtual Camera**, [upstream](https://github.com/obsproject/obs-studio)
   and its upstream license, for the virtual camera extension.
-- **BlackHole 2ch**, [upstream](https://github.com/ExistentialAudio/BlackHole)
-  and its upstream license, for the virtual microphone loopback device.
+
+The **TwinDesk Microphone** AudioServerPlugIn is adapted from the MIT-licensed
+[LemurCam](https://github.com/steelbrain/LemurCam) audio driver. Its retained
+[license](mac/AudioDriver/LEMURCAM-LICENSE.md) is included with the source.

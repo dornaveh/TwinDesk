@@ -89,10 +89,9 @@ import OSLog
     }
     private func updateDemand() {
         video.setDemand(cameraEnabled)
-        // FaceTime may not open a virtual microphone while showing its camera
-        // preview. Starting the camera is an explicit request for call media, so
-        // keep its paired microphone live as well. Other apps still activate the
-        // microphone automatically when they open BlackHole.
+        // Starting the camera is an explicit request for call media, so keep its
+        // paired microphone transport ready too. Apps also activate microphone
+        // transport automatically when they open TwinDesk Microphone.
         mic.setDemand(microphoneEnabled && (cameraEnabled || demandMonitor.microphoneInUse()))
     }
     func toggleCamera() {
@@ -116,7 +115,7 @@ import OSLog
         WindowGroup("TwinDesk Calls", id: "calls") {
             VStack(alignment: .leading, spacing: 14) {
                 Text("PC webcam and microphone").font(.title2)
-                Text("Mac speaker audio flows automatically to the PC. Start and stop the camera feed here. The microphone activates only while a Mac app uses BlackHole 2ch.")
+                Text("Mac speaker audio flows automatically to the PC. Start and stop the camera feed here. The microphone activates when a Mac app uses TwinDesk Microphone.")
                 SecureField("Call-media setup code from Windows", text: $model.setup).disabled(model.running)
                 HStack {
                     Button("Start", action: model.start).disabled(model.running || model.setup.isEmpty)
@@ -126,7 +125,7 @@ import OSLog
                 Text(model.videoStatus)
                 Text(model.micStatus)
                 Text(model.speakerStatus)
-                Text("In your calling app, select OBS Virtual Camera and BlackHole 2ch. Keep its speakers on the normal Mac output.").font(.callout)
+                Text("In your calling app, select OBS Virtual Camera and TwinDesk Microphone. Keep its speakers on the normal Mac output.").font(.callout)
             }.padding(24).frame(width: 480)
                 .onAppear { if ProcessInfo.processInfo.arguments.contains("--startup") { NSApp.hide(nil) } }
         }.windowResizability(.contentSize)

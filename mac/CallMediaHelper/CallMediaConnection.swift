@@ -167,14 +167,15 @@ final class CallMediaConnection {
                 func level(_ peak: Float) -> String {
                     peak > 0 ? "\(Int((20 * log10(peak)).rounded())) dBFS" : "silence"
                 }
-                report?("PC mic \(level(levels.received)) · BlackHole \(level(levels.rendered)) · buffer \(levels.renderedSamples)/\(levels.requestedSamples)")
+                let bufferedMilliseconds = levels.bufferedFrames * 1000 / 48_000
+                report?("PC mic \(level(levels.received)) · TwinDesk Microphone \(levels.writtenFrames) frames · \(bufferedMilliseconds) ms buffered")
             }
         }
         else { throw BridgeError.message("Unexpected media packet.") }
         lastMedia = ProcessInfo.processInfo.systemUptime
         if !announced {
             announced = true
-            report?(medium == .camera ? "Receiving \(camera.inputHeight)p video · select OBS Virtual Camera in your calling app." : "Receiving PC microphone · select BlackHole 2ch in your calling app.")
+            report?(medium == .camera ? "Receiving \(camera.inputHeight)p video · select OBS Virtual Camera in your calling app." : "Receiving PC microphone · select TwinDesk Microphone in your calling app.")
         }
     }
     private func send(_ kind: UInt8, _ payload: Data) {
