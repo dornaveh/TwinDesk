@@ -13,6 +13,11 @@ public sealed class Settings
     public string AudioDeviceName { get; set; } = "Windows default output";
     public string? AudioEndpointId { get; set; }
     public bool SwitchDisplays { get; set; }
+    public string CameraDeviceId { get; set; } = "";
+    public string CameraMode { get; set; } = "720p30";
+    public bool CameraAllowed { get; set; }
+    public bool MicrophoneAllowed { get; set; }
+    public string MicrophoneDeviceId { get; set; } = "";
     public List<MonitorRoute> Monitors { get; set; } = [];
     public static string DataDirectory { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TwinDesk");
     public static string PathFor(string name) => Path.Combine(DataDirectory, name);
@@ -29,6 +34,21 @@ public sealed class Identity : IDisposable
 {
     public X509Certificate2 Certificate { get; }
     public string Token { get; }
+    private readonly Lazy<string> mediaToken = new(() => {
+        var path = Settings.PathFor("media-token.protected");
+        if (File.Exists(path))
+        {
+            var saved = Protect(File.ReadAllBytes(path), false);
+            if (saved.Length != 32) throw new InvalidDataException("Invalid saved media credential.");
+            return Convert.ToHexString(saved);
+        }
+        var token = RandomNumberGenerator.GetBytes(32);
+        var temporary = path + ".tmp";
+        File.WriteAllBytes(temporary, Protect(token, true));
+        File.Move(temporary, path, false);
+        return Convert.ToHexString(token);
+    });
+    public string MediaToken => mediaToken.Value;
     public string Fingerprint => Convert.ToHexString(SHA256.HashData(Certificate.RawData));
     private record Secret(string Pfx, string Token);
     public Identity()

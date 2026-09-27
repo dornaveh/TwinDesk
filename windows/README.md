@@ -45,6 +45,33 @@ Without that registration, settings normally live in `%LOCALAPPDATA%\TwinDesk`.
 The `--data <directory>` option or a local `data-directory.txt` beside the app
 can select a different runtime directory. Do not commit or share these files.
 
+## Camera and microphone for Mac calls
+
+Open **Camera & mic** in the window or tray menu. Select the webcam and microphone
+and allow each device independently. These permissions and device selections
+are remembered, but capture stays idle until the authenticated Mac requests it.
+Start and stop the camera feed from the Mac menu. Microphone capture starts
+when a Mac app uses the BlackHole input and stops when that demand ends.
+Disconnecting the receiver also stops capture.
+
+The default camera profile requests native 1280×720 at 30 fps; 1920×1080 at
+15 fps is also available. Unsupported resolutions fail visibly rather than
+being upscaled on Windows. The tested Logitech USB camera delivered about
+15 fps with either profile, including in an independent capture check.
+The Mac helper scales 720p frames to the OBS virtual camera's 1080p output;
+this does not add detail.
+
+Use **Copy Mac media setup code** with the separate
+[Mac Calls helper](../mac/CallMediaHelper/README.md). Its media credential cannot
+control the PC; it survives reconnects and is protected with Windows DPAPI.
+Keep the code private. Video, microphone, and speaker audio use separate bounded
+connections so video traffic does not queue behind keyboard events. Nothing is
+saved as a recording.
+
+The Calls helper takes over Mac speaker capture to exclude the forwarded
+microphone from the return audio. Follow its setup instructions before enabling
+the microphone; do not run the old Mac audio tap and the helper microphone together.
+
 ## Optional direct Ethernet and C:/E: file sharing
 
 This is optional and independent of KVM. The supplied helper is deliberately

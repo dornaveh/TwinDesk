@@ -9,6 +9,7 @@ public sealed class MainForm : Form
 {
     private readonly Settings settings;
     private readonly Identity identity;
+    private readonly MediaSharingForm media;
     private readonly ComboBox network = new() { DropDownStyle = ComboBoxStyle.DropDown, Width = 290 };
     private readonly ComboBox speakers = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 380 };
     private readonly CheckBox displays = new() { Text = "Switch both monitor inputs with keyboard and mouse", AutoSize = true };
@@ -39,6 +40,7 @@ public sealed class MainForm : Form
         if (startInTray) StartupTrace.Write("form construction started");
         this.startInTray = startInTray;
         settings = Settings.Load(); identity = new Identity();
+        media = new MediaSharingForm(settings);
         Text = "TwinDesk"; Size = new Size(900, 830); MinimumSize = new Size(780, 740);
         StartPosition = FormStartPosition.CenterScreen;
         if (startInTray) { ShowInTaskbar = false; WindowState = FormWindowState.Minimized; }
@@ -51,7 +53,9 @@ public sealed class MainForm : Form
         Add(layout, new Label { Text = "Double middle-click / Ctrl + Alt + F12: switch     ·     Ctrl + Alt + F11: PC", AutoSize = true }, 36);
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
         var recover = Button("Restore PC displays");
-        actions.Controls.AddRange([start, swap, recover]); swap.Enabled = false;
+        var mediaButton = Button("Camera & mic");
+        mediaButton.Click += (_, _) => { media.Show(); media.Activate(); };
+        actions.Controls.AddRange([start, swap, recover, mediaButton]); swap.Enabled = false;
         Add(layout, actions, 52);
         foreach (var adapter in NetworkInterface.GetAllNetworkInterfaces().Where(x => x.OperationalStatus == OperationalStatus.Up && x.NetworkInterfaceType != NetworkInterfaceType.Loopback))
             foreach (var ip in adapter.GetIPProperties().UnicastAddresses.Where(x => x.Address.AddressFamily == AddressFamily.InterNetwork)) network.Items.Add(ip.Address.ToString());
@@ -102,6 +106,7 @@ public sealed class MainForm : Form
         connection.ForeColor = Color.FromArgb(113, 211, 196);
         var menu = new ContextMenuStrip();
         menu.Items.Add("Open TwinDesk", null, (_, _) => OpenWindow());
+        menu.Items.Add("Camera & microphone", null, (_, _) => { media.Show(); media.Activate(); });
         menu.Items.Add("Switch to Mac", null, (_, _) => RequestSwitch(Computer.Mac));
         menu.Items.Add("Return to PC", null, (_, _) => RequestSwitch(Computer.PC));
         menu.Items.Add("Quit TwinDesk", null, async (_, _) => { await Stop(); quitting = true; Close(); });
@@ -154,7 +159,7 @@ public sealed class MainForm : Form
             else try { await Scan(); } catch (Exception e) { Note(e.Message); }
             Note("Speaker output: " + (speakers.SelectedItem?.ToString() ?? "Select an output"));
         };
-        FormClosing += (_, e) => { if (!quitting && server is not null && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); tray.ShowBalloonTip(2000, "TwinDesk is still running", "Use the tray menu to quit and return control to the PC.", ToolTipIcon.Info); } else { input?.Dispose(); Microsoft.Win32.SystemEvents.SessionSwitch -= SessionChanged; Microsoft.Win32.SystemEvents.PowerModeChanged -= PowerChanged; tray.Dispose(); audioTimer.Dispose(); identity.Dispose(); } };
+        FormClosing += (_, e) => { if (!quitting && server is not null && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); tray.ShowBalloonTip(2000, "TwinDesk is still running", "Use the tray menu to quit and return control to the PC.", ToolTipIcon.Info); } else { media.CancelCapture(); media.Dispose(); input?.Dispose(); Microsoft.Win32.SystemEvents.SessionSwitch -= SessionChanged; Microsoft.Win32.SystemEvents.PowerModeChanged -= PowerChanged; tray.Dispose(); audioTimer.Dispose(); identity.Dispose(); } };
     }
     private record InputChoice(uint Value, string Name);
     private void MigrateAudioSelection()
@@ -278,6 +283,7 @@ public sealed class MainForm : Form
             audio.DevicesChanged += snapshot => UI(() => { if (player == audio) RefreshAudioChoices(snapshot); });
             audio.Start();
             server = new BridgeServer(settings.BindAddress, settings.Port, identity);
+            await media.AttachAsync(server);
             server.Status += message => UI(() => Note(message));
             server.ReturnToWindowsRequested += () => UI(() => RequestSwitch(Computer.PC));
             server.Audio += bytes => player?.Push(bytes);
@@ -371,6 +377,7 @@ public sealed class MainForm : Form
     private void ShowTarget(bool mac) { active.Text = mac ? "Controlling the Mac" : "Controlling this PC"; swap.Text = mac ? "Switch to PC" : "Switch to Mac"; tray.Text = mac ? "TwinDesk · Mac" : "TwinDesk · PC"; }
     private async Task Stop()
     {
+        await media.AttachAsync(null);
         input?.SetRemote(false); operation?.Cancel();
         if (server is not null)
         {

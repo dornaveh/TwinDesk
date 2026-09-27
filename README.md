@@ -22,6 +22,10 @@ FileVault unlock, recovery, or protected Windows desktops.
   tray and provides a Mac menu-bar companion.
 - Offers optional Windows C: and E: drive sharing through ordinary SMB/Finder.
   File sharing is separate from the KVM connection.
+- Optionally sends a PC webcam and microphone to Mac calling apps through the
+  [TwinDesk Calls helper](mac/CallMediaHelper/README.md). Camera modes are
+  1280×720 requesting 30 fps and 1920×1080 requesting 15 fps. The tested USB
+  camera delivered about 15 fps in both modes; selecting 30 fps does not guarantee it.
 
 ## Requirements and cables
 
@@ -38,9 +42,10 @@ FileVault unlock, recovery, or protected Windows desktops.
 
 1. On Windows, run `powershell -NoProfile -File windows/tools/Build-Windows.ps1`.
    Open `windows/dist/TwinDesk-Windows/TwinDesk.exe`.
-2. Build and install the companion using [mac/README.md](mac/README.md). Grant
-   Accessibility to the installed app for input control and audio-capture
-   permission when macOS asks. Install before granting permissions: replacing
+2. Build and install the main companion and its background Calls helper using
+   [mac/README.md](mac/README.md). Grant Accessibility to the main app for input
+   control and system-audio recording to the helper when macOS asks.
+   Install before granting permissions: replacing
    an ad-hoc signed build can require granting them again.
 3. In Windows TwinDesk, select the PC's network address reachable from the Mac.
    A fresh install starts on loopback until you choose the appropriate address.
@@ -53,7 +58,9 @@ FileVault unlock, recovery, or protected Windows desktops.
 5. Enable monitor switching while disconnected, then reconnect. Test one
    direction at a time and confirm both screens. Refresh remains available
    during a connection; refreshing does not switch inputs or disconnect the Mac.
-6. Enable Mac audio forwarding and select your Windows output. The PC must stay
+6. Pair the Calls helper using the separate media setup code in Windows
+   **Camera & mic**, then select your Windows audio output. Mac audio forwarding
+   is automatic; camera and microphone sharing are optional. The PC must stay
    powered on and awake for input and audio forwarding.
 
 No network, shares, startup tasks, or system permissions are changed just by
@@ -83,8 +90,10 @@ for apps supporting those navigation shortcuts.
 
 ## Audio and muting
 
-The Mac uses audio-only Core Audio process taps, not ScreenCaptureKit. The
-stream is stereo 48 kHz/16-bit PCM over the paired TLS connection. Windows uses
+The background Mac Calls helper uses an audio-only Core Audio process tap,
+excluding its own microphone playback to avoid feeding it back to the PC.
+The stream is stereo 48 kHz/16-bit PCM over a separate authenticated TLS
+connection. Windows uses
 shared WASAPI with the driver's low-latency mode when supported, allowing PC
 and Mac sound together. It falls back when the selected output format differs
 or the device cannot use the low-latency path.
@@ -124,7 +133,9 @@ scripts and dependency notices. `mac/` contains the Mac app, its audio
 components, build/install scripts and the bundled Apple Silicon display helper.
 
 The PC creates a local certificate and random pairing token. The Mac pins the
-certificate; pairing state is protected with Windows DPAPI and Mac Keychain.
+certificate; main pairing state is protected with Windows DPAPI and Mac Keychain.
+The helper uses a separate media-only credential stored in a private Mac
+application-support directory; it cannot authorize keyboard or mouse control.
 There is no hosted relay or account service. TwinDesk does not record audio or
 log typed text. Runtime identity files, pairing codes, local logs, private
 deployment helpers and machine-specific commissioning records are excluded

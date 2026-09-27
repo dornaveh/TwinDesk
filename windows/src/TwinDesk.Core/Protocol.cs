@@ -4,12 +4,13 @@ using System.Text;
 
 namespace TwinDesk;
 
-public enum PacketKind : byte { Hello = 1, Audio = 2, Command = 3, Reply = 4, Heartbeat = 5, Welcome = 6, Input = 7 }
+public enum PacketKind : byte { Hello = 1, Audio = 2, Command = 3, Reply = 4, Heartbeat = 5, Welcome = 6, Input = 7, Camera = 8, CameraStatus = 9 }
 public record Packet(PacketKind Kind, byte[] Data);
 
 public static class Wire
 {
     public const int MaxPacket = 65536;
+    public const int MaxCameraJpeg = 4194304;
     public static async Task<Packet> ReadAsync(Stream stream, CancellationToken ct)
     {
         var header = new byte[4];
@@ -26,6 +27,19 @@ public static class Wire
     public static async Task WriteAsync(Stream stream, PacketKind kind, byte[] data, CancellationToken ct)
     {
         if (data.Length >= MaxPacket) throw new InvalidDataException("Packet too large.");
+        if (kind == PacketKind.Camera) throw new InvalidDataException("Camera requires a separate connection.");
+        await WriteFrame(stream, kind, data, ct);
+    }
+
+    public static Task WriteCameraAsync(Stream stream, byte[] jpeg, CancellationToken ct)
+    {
+        if (jpeg.Length is < 4 or > MaxCameraJpeg || jpeg[0] != 0xff || jpeg[1] != 0xd8 || jpeg[^2] != 0xff || jpeg[^1] != 0xd9)
+            throw new InvalidDataException("Invalid camera JPEG.");
+        return WriteFrame(stream, PacketKind.Camera, jpeg, ct);
+    }
+
+    private static async Task WriteFrame(Stream stream, PacketKind kind, byte[] data, CancellationToken ct)
+    {
         var frame = new byte[data.Length + 5];
         BinaryPrimitives.WriteInt32BigEndian(frame, data.Length + 1);
         frame[4] = (byte)kind;

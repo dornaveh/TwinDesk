@@ -24,6 +24,7 @@ if [[ "$SIGNING_IDENTITY" == "-" ]]; then
 fi
 codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$OUT/Contents/Helpers/display-control"
 codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$OUT"
+bash "CallMediaHelper/Build.command"
 echo "Built: $OUT"
-echo "Move TwinDesk.app into Applications before granting Accessibility and audio permissions."
+echo "Install both TwinDesk.app and CallMediaHelper/dist/TwinDesk-Calls.app into Applications. The helper runs behind the single TwinDesk menu."
 if [[ "${TWINDESK_NO_REVEAL:-0}" != "1" ]]; then open -R "$OUT"; fi

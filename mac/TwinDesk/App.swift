@@ -7,12 +7,13 @@ import AppKit
     @Published var audioStatus = "Audio is independent of keyboard and monitor switching."
     @Published var running = false
     @Published var connected = false
-    @Published var sendAudio = UserDefaults.standard.object(forKey: "sendAudio") as? Bool ?? true
+    @Published var sendAudio = false
     @Published var routes: [DisplayRoute] = []
     private let link = Connection()
     private let audio = AudioCapture()
     private var resumeAfterWake = false
     init() {
+        UserDefaults.standard.set(false, forKey: "sendAudio")
         if let bytes = UserDefaults.standard.data(forKey: "displays"), let saved = try? JSONDecoder().decode([DisplayRoute].self, from: bytes) { routes = saved }
         link.report = { [weak self] text in
             NSLog("TwinDesk connection: %@", text)
@@ -102,8 +103,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main @MainActor struct TwinDeskApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var model = AppModel()
+    @StateObject private var calls = CallMenu()
     init() {
-        if ProcessInfo.processInfo.arguments.contains("--diagnostics") {
+        if ProcessInfo.processInfo.arguments.contains("--diagnostics") || ProcessInfo.processInfo.arguments.contains("--authorize") {
+            if ProcessInfo.processInfo.arguments.contains("--authorize") {
+                let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+                _ = AXIsProcessTrustedWithOptions(options)
+            }
             let saved = PairingStore.load()
             let pairing = try? Pairing.parse(saved)
             let info: [String: Any] = [
@@ -114,12 +120,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 "pairedPort": Int(pairing?.port ?? 0)
             ]
             if let data = try? JSONSerialization.data(withJSONObject: info, options: [.sortedKeys]),
-               let text = String(data: data, encoding: .utf8) { print(text) }
+               let text = String(data: data, encoding: .utf8) { print(text); NSLog("TwinDesk permission check: %@", text) }
             exit(0)
         }
     }
     var body: some Scene {
-        WindowGroup("TwinDesk") { ContentView(model: model).onAppear { delegate.cleanup = { model.disconnect() }; delegate.hideStartupWindowOnce() } }.defaultSize(width: 660, height: 610)
+        WindowGroup("TwinDesk") { ContentView(model: model).onAppear { delegate.cleanup = { calls.send("quitHelper"); model.disconnect() }; delegate.hideStartupWindowOnce() } }.defaultSize(width: 660, height: 610)
             .commands {
                 CommandGroup(after: .appInfo) {
                     Button("Switch back to Windows") { model.returnToWindows() }.disabled(!model.connected)
@@ -129,6 +135,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MenuBarExtra("TwinDesk", systemImage: "desktopcomputer") {
             Text(model.connected ? "Connected to PC" : "Disconnected")
             Button("Switch back to Windows") { model.returnToWindows() }.disabled(!model.connected)
+            Divider()
+            Button(calls.state?.cameraEnabled == true ? "Stop camera feed" : "Start camera feed") {
+                calls.send(calls.state?.cameraEnabled == true ? "stopCamera" : "startCamera")
+            }
+            Toggle("Use PC microphone automatically", isOn: Binding(get: { calls.state?.microphoneEnabled ?? false }, set: { calls.send($0 ? "enableMicrophone" : "disableMicrophone") }))
+            if let state = calls.state { Text(state.videoStatus); Text(state.micStatus) }
+            if !calls.error.isEmpty { Text(calls.error) }
+            Button("Camera & microphone settings…") { calls.launch(background: false) }
             Divider()
             Button("Open TwinDesk") {
                 NSApp.unhide(nil)
@@ -158,8 +172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Button("Allow keyboard & mouse") { model.accessibility() }
                 Button("Refresh monitors") { model.scan() }.disabled(model.running)
             }
-            Toggle("Play Mac system audio through the PC", isOn: $model.sendAudio).onChange(of: model.sendAudio) { _ in model.audioChanged() }
-            Text(model.audioStatus).font(.callout).foregroundStyle(.secondary)
+            Text("Mac audio flows automatically to the PC through the background Calls helper.").font(.callout).foregroundStyle(.secondary)
             Divider()
             Text("Monitor return inputs").font(.headline)
             ForEach($model.routes) { $route in

@@ -12,6 +12,10 @@
 /mac/third_party/m1ddc/m1ddc
 **/settings.json
 **/identity.protected
+**/media-token.protected
+**/call-bootstrap.json
+**/pairing.json
+**/media-pairing.json
 **/data-directory.txt
 **/*.log
 **/*.user

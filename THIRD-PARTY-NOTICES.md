@@ -15,5 +15,12 @@ No project-wide license has been selected for TwinDesk's own code.
   [upstream](https://github.com/waydabber/m1ddc).
 
 Windows publish output contains its dependency license files. The Mac build
-includes the m1ddc license in the app bundle. No third-party executable needs
-to be installed or configured separately by the user.
+includes the m1ddc license in the app bundle.
+
+The optional Mac Calls helper uses two separately installed components. Their
+binaries are not redistributed in this repository:
+
+- **OBS Studio / OBS Virtual Camera**, [upstream](https://github.com/obsproject/obs-studio)
+  and its upstream license, for the virtual camera extension.
+- **BlackHole 2ch**, [upstream](https://github.com/ExistentialAudio/BlackHole)
+  and its upstream license, for the virtual microphone loopback device.

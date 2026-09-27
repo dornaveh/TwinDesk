@@ -1,0 +1,63 @@
+# TwinDesk Calls for Mac
+
+Receive a Windows webcam and its microphone in Mac calling apps.
+This helper runs alongside the existing TwinDesk keyboard/mouse app. It does not
+read that app's Keychain item, inject input, or capture the screen.
+
+## Requirements
+
+- Apple Silicon Mac, macOS 14.2 or later, paired Windows TwinDesk with call-media support.
+- [OBS Studio](https://obsproject.com/) 30 or newer. Enable OBS Virtual Camera in
+  System Settings → General → Login Items & Extensions → Camera Extensions.
+  Close OBS after enabling it; TwinDesk feeds its separately installed extension.
+- [BlackHole 2ch](https://existential.audio/blackhole/). Install the signed driver;
+  macOS may need an audio-service restart or restart before it appears.
+
+## Build and install
+
+Run `./Build.command`. Copy `dist/TwinDesk-Calls.app` to `/Applications`.
+The helper is signed locally by default; changed builds may require renewed
+system-audio approval. Set `TWINDESK_SIGNING_IDENTITY` for an available stable identity.
+
+During setup, transfer speaker-audio ownership from the regular TwinDesk app to
+Calls: disable the regular app's old global audio capture while leaving its
+keyboard/mouse connection running. Calls then forwards speaker audio automatically.
+For the legacy app, a setup operator can persist `sendAudio=false` in
+`local.twindesk.mac` and relaunch the exact trusted app binary, preserving its
+Keychain/Accessibility identity. Coordinate the relaunch to avoid unwanted
+monitor recovery. Do not run both audio capture paths together.
+
+Open Windows TwinDesk's call-media controls, select the webcam and its microphone,
+and enable sharing. Copy its call-media setup code into TwinDesk Calls and start.
+Approve the helper's System Audio Recording request. No screen capture is used.
+The setup code is a scoped media credential, not permission to control the PC.
+It is stored under `~/Library/Application Support/TwinDesk Calls/` with directory
+permissions 0700 and file permissions 0600. Never publish or log it.
+
+For automatic login, add `/Applications/TwinDesk-Calls.app` as a login item.
+It accepts `--startup` to hide its initial window. The helper runs without a menu-bar or Dock icon. Choose **Start camera feed** / **Stop camera feed** in the main **TwinDesk** menu; **Camera & microphone settings…** opens its setup window. The camera always starts off after launch or sleep. Microphone permission is remembered, but capture starts only while another Mac process actively uses BlackHole 2ch as an input;
+speaker forwarding is automatic while the helper runs. Keep the regular TwinDesk
+app running as well.
+
+In the Mac calling app choose:
+
+- **Camera:** OBS Virtual Camera
+- **Microphone:** BlackHole 2ch
+- **Speakers:** normal Mac system output, not BlackHole
+
+Calls sends microphone audio only to BlackHole and captures only the normal
+speaker output while excluding its own process. This avoids returning microphone
+audio to the PC speakers. The PC must remain awake and connected. The main menu uses private local command/status files containing only media controls and status, never pairing credentials. Commands expire after ten seconds, are consumed once, and only named camera/microphone controls or helper quit are accepted. Quitting TwinDesk stops the helper.
+
+Camera frames
+and microphone/speaker PCM are streamed in memory, not saved as recordings.
+
+Separate authenticated TLS connections carry camera, microphone, and speaker
+streams; the helper obtains a fresh media session after reconnecting. Queues are
+bounded. The helper accepts 1080p or 720p JPEG up to 30fps. OBS exposes a fixed 1080p virtual device, so 720p input is scaled to that output; this does not add detail. The tested webcam delivered roughly 15fps even at the requested 720p/30 setting.
+A calling service may independently reduce outgoing resolution.
+
+## Validation
+
+The Mac helper builds; synthetic 1080p frames were submitted to the enabled OBS
+sink, and BlackHole output opened at 48kHz stereo. Microphone demand detection passed a separate-process input open/close test. Windows defaults camera/microphone demand to off; manual camera Start sends an explicit demand message. Stop drops queued media and closes the camera connection. The installed single-menu Start command received live 720p frames from Windows; Stop closed the camera connection and left capture off. Main control and speaker audio reconnected after the coordinated update. A real calling-app preview/call still needs user verification before claiming end-to-end calling compatibility.

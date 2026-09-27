@@ -18,6 +18,17 @@ public sealed class BridgeServer : IAsyncDisposable
     private int clientId;
     private Task? acceptTask;
     private Peer? peer;
+    private readonly object cameraGate = new();
+    private CameraPeer? camera;
+    private bool cameraEnabled;
+    private VideoMode cameraMode = VideoMode.Hd;
+    private CameraPeer? microphone;
+    private bool microphoneEnabled;
+    private SpeakerPeer? speakers;
+    public bool CameraConnected { get { lock (cameraGate) return cameraEnabled && camera?.Demanded == true; } }
+    public bool MicrophoneConnected { get { lock (cameraGate) return microphoneEnabled && microphone?.Demanded == true; } }
+    public event Action<bool>? CameraConnectionChanged;
+    public event Action<bool>? MicrophoneConnectionChanged;
     public bool Connected => Volatile.Read(ref peer) is not null;
     public event Action<bool>? ConnectionChanged;
     public event Action<byte[]>? Audio;
@@ -67,19 +78,44 @@ public sealed class BridgeServer : IAsyncDisposable
                 var hello = await Wire.ReadAsync(stream, deadline.Token);
                 if (hello.Kind != PacketKind.Hello) throw new InvalidDataException("Pairing required.");
                 using var json = JsonDocument.Parse(hello.Data);
-                if (json.RootElement.GetProperty("version").GetInt32() != 1 ||
-                    !Wire.TokenMatches(identity.Token, json.RootElement.GetProperty("token").GetString()))
+                if (json.RootElement.GetProperty("version").GetInt32() != 1)
+                    throw new InvalidDataException("Pairing not accepted.");
+                if (json.RootElement.TryGetProperty("role", out var role))
+                {
+                    if (!Wire.TokenMatches(identity.MediaToken, json.RootElement.GetProperty("token").GetString()))
+                        throw new InvalidDataException("Media pairing not accepted.");
+                    var owner = Volatile.Read(ref peer);
+                    if (owner is null || !owner.Active) throw new InvalidDataException("Connect the main Mac app first.");
+                    if (role.GetString() == "media-session")
+                    {
+                        await Wire.WriteAsync(stream, PacketKind.Welcome, JsonSerializer.SerializeToUtf8Bytes(new {
+                            version = 1, role = "media-session", cameraSession = owner.CameraSession
+                        }), deadline.Token);
+                        return;
+                    }
+                    var isMicrophone = role.GetString() == "microphone";
+                    var isSpeakers = role.GetString() == "speakers";
+                    if (!isMicrophone && !isSpeakers && role.GetString() != "camera") throw new InvalidDataException("Unknown connection role.");
+                    if (!json.RootElement.TryGetProperty("cameraSession", out var session) ||
+                        !Wire.TokenMatches(owner.CameraSession, session.GetString()))
+                        throw new InvalidDataException("A current paired Mac session is required.");
+                    handshakes.Release(); slotHeld = false;
+                    if (isSpeakers) await ServeSpeakers(stream, owner, deadline.Token);
+                    else await ServeCamera(stream, owner, deadline.Token, isMicrophone);
+                    return;
+                }
+                if (!Wire.TokenMatches(identity.Token, json.RootElement.GetProperty("token").GetString()))
                     throw new InvalidDataException("Pairing not accepted.");
                 candidate = new Peer(stream, stop.Token);
                 if (Interlocked.CompareExchange(ref peer, candidate, null) is not null) throw new InvalidDataException("A Mac is already connected.");
                 handshakes.Release(); slotHeld = false;
-                await Wire.WriteAsync(stream, PacketKind.Welcome, JsonSerializer.SerializeToUtf8Bytes(new { version = 1, sampleRate = 48000, channels = 2, bits = 16, supportsReturnToWindows = true }), deadline.Token);
+                await Wire.WriteAsync(stream, PacketKind.Welcome, JsonSerializer.SerializeToUtf8Bytes(new { version = 1, sampleRate = 48000, channels = 2, bits = 16, supportsReturnToWindows = true, supportsCamera = true, supportsMicrophone = true, cameraSession = candidate.CameraSession }), deadline.Token);
                 ConnectionChanged?.Invoke(true);
                 Status?.Invoke("Mac connected over an encrypted link.");
-                await candidate.Run(Audio, ReturnToWindowsRequested);
+                await candidate.Run(data => { lock (cameraGate) { if (speakers?.Active != true) Audio?.Invoke(data); } }, ReturnToWindowsRequested);
             }
         }
-        catch (Exception e) when (e is IOException or AuthenticationException or SocketException or OperationCanceledException or JsonException or KeyNotFoundException or InvalidOperationException)
+        catch (Exception e) when (e is IOException or InvalidDataException or AuthenticationException or SocketException or OperationCanceledException or JsonException or KeyNotFoundException or InvalidOperationException)
         {
             if (!stop.IsCancellationRequested) Status?.Invoke(candidate is null ? "A connection could not complete pairing." : "Mac connection ended.");
         }
@@ -88,7 +124,11 @@ public sealed class BridgeServer : IAsyncDisposable
             if (candidate is not null)
             {
                 candidate.Close();
-                if (Interlocked.CompareExchange(ref peer, null, candidate) == candidate) ConnectionChanged?.Invoke(false);
+                if (Interlocked.CompareExchange(ref peer, null, candidate) == candidate)
+                {
+                    CloseCamera();
+                    ConnectionChanged?.Invoke(false);
+                }
             }
             if (slotHeld) handshakes.Release();
         }
@@ -96,7 +136,123 @@ public sealed class BridgeServer : IAsyncDisposable
     public Task CommandAsync(string name, CancellationToken ct = default) =>
         Volatile.Read(ref peer)?.Command(name, ct) ?? Task.FromException(new IOException("Mac is not connected."));
     public bool SendInput(byte[] data) => Volatile.Read(ref peer)?.Enqueue(new Packet(PacketKind.Input, data)) == true;
-    public void Disconnect() => Volatile.Read(ref peer)?.Close();
+    public string CreateMediaSetupCode()
+    {
+        var owner = Volatile.Read(ref peer);
+        if (owner is null || !owner.Active) throw new IOException("Connect your Mac to TwinDesk first.");
+        var endpoint = (IPEndPoint)listener.LocalEndpoint;
+        var pairingCode = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(new {
+            version = 1, host = endpoint.Address.ToString(), port = endpoint.Port,
+            token = identity.MediaToken, fingerprint = identity.Fingerprint
+        }));
+        return Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(new { pairingCode, session = owner.CameraSession }));
+    }
+    public void Disconnect() { Volatile.Read(ref peer)?.Close(); CloseCamera(); }
+    public void SetCameraSharing(bool enabled)
+    {
+        lock (cameraGate)
+        {
+            cameraEnabled = enabled;
+            camera?.Close(); // Discard queued frames; the Mac reconnects to get the new state.
+        }
+        CameraConnectionChanged?.Invoke(false);
+    }
+    public void SetCameraMode(VideoMode mode)
+    {
+        lock (cameraGate) { cameraMode = mode; camera?.Close(); }
+        CameraConnectionChanged?.Invoke(false);
+    }
+    public void SetMicrophoneSharing(bool enabled)
+    {
+        lock (cameraGate) { microphoneEnabled = enabled; microphone?.Close(); }
+        MicrophoneConnectionChanged?.Invoke(false);
+    }
+    // Bind a capture to this particular media connection. A late callback from a
+    // cancelled capture can never leak a frame into a newly paired/reconnected session.
+    public Action<byte[]> MediaSender(bool isMicrophone)
+    {
+        CameraPeer? session;
+        long generation;
+        lock (cameraGate) { session = isMicrophone ? microphone : camera; generation = session?.DemandGeneration ?? 0; }
+        return data => {
+            lock (cameraGate)
+                if (session is not null && peer?.Active == true &&
+                    (isMicrophone ? microphoneEnabled && microphone == session : cameraEnabled && camera == session)) session.Send(data, generation);
+        };
+    }
+    private void CloseCamera()
+    {
+        lock (cameraGate) { camera?.Close(); microphone?.Close(); speakers?.Close(); }
+        CameraConnectionChanged?.Invoke(false);
+        MicrophoneConnectionChanged?.Invoke(false);
+    }
+    private async Task ServeSpeakers(SslStream stream, Peer owner, CancellationToken handshake)
+    {
+        SpeakerPeer session;
+        lock (cameraGate)
+        {
+            if (peer != owner || !owner.Active || speakers is not null) throw new InvalidDataException("Speaker session is unavailable.");
+            session = new SpeakerPeer(stream, owner.Token);
+            speakers = session;
+        }
+        try
+        {
+            await Wire.WriteAsync(stream, PacketKind.Welcome, JsonSerializer.SerializeToUtf8Bytes(new {
+                version = 1, role = "speakers", sampleRate = 48000, channels = 2, bits = 16
+            }), handshake);
+            await Wire.WriteAsync(stream, PacketKind.CameraStatus, JsonSerializer.SerializeToUtf8Bytes(new {
+                enabled = true, message = "Mac speaker audio forwarding active."
+            }), handshake);
+            await session.Run(data => { lock (cameraGate) { if (speakers == session && peer == owner && owner.Active) Audio?.Invoke(data); } });
+        }
+        finally
+        {
+            session.Close();
+            lock (cameraGate) { if (speakers == session) speakers = null; }
+            session.Dispose();
+        }
+    }
+    private async Task ServeCamera(SslStream stream, Peer owner, CancellationToken handshake, bool isMicrophone)
+    {
+        CameraPeer session;
+        bool enabled;
+        VideoMode mode;
+        lock (cameraGate)
+        {
+            if (peer != owner || !owner.Active || (isMicrophone ? microphone : camera) is not null) throw new InvalidDataException("Media session is unavailable.");
+            enabled = isMicrophone ? microphoneEnabled : cameraEnabled;
+            mode = cameraMode;
+            session = new CameraPeer(stream, owner.Token, isMicrophone);
+            session.DemandChanged += demanded => {
+                bool accepted;
+                lock (cameraGate) accepted = demanded && peer == owner && owner.Active &&
+                    (isMicrophone ? microphoneEnabled && microphone == session : cameraEnabled && camera == session);
+                if (isMicrophone) MicrophoneConnectionChanged?.Invoke(accepted); else CameraConnectionChanged?.Invoke(accepted);
+            };
+            if (isMicrophone) microphone = session; else camera = session;
+        }
+        try
+        {
+            var welcome = isMicrophone
+                ? JsonSerializer.SerializeToUtf8Bytes(new { version = 1, role = "microphone", sampleRate = 48000, channels = 2, bits = 16 })
+                : JsonSerializer.SerializeToUtf8Bytes(new { version = 1, role = "camera", codec = "jpeg", width = mode.Width, height = mode.Height, fps = mode.Fps });
+            await Wire.WriteAsync(stream, PacketKind.Welcome, welcome, handshake);
+            var label = isMicrophone ? "microphone" : "camera";
+            await Wire.WriteAsync(stream, PacketKind.CameraStatus, JsonSerializer.SerializeToUtf8Bytes(new { enabled, message = enabled ? $"PC {label} sharing enabled." : $"Enable {label} sharing in TwinDesk on Windows." }), handshake);
+            await session.Run();
+        }
+        finally
+        {
+            session.Close();
+            lock (cameraGate)
+            {
+                if (isMicrophone && microphone == session) microphone = null;
+                if (!isMicrophone && camera == session) camera = null;
+            }
+            if (isMicrophone) MicrophoneConnectionChanged?.Invoke(false); else CameraConnectionChanged?.Invoke(false);
+            session.Dispose();
+        }
+    }
     public async ValueTask DisposeAsync()
     {
         stop.Cancel(); listener.Stop(); Disconnect();
@@ -111,6 +267,9 @@ public sealed class BridgeServer : IAsyncDisposable
         private readonly CancellationTokenSource lifetime;
         private readonly Channel<Packet> output = Channel.CreateBounded<Packet>(new BoundedChannelOptions(128) { FullMode = BoundedChannelFullMode.Wait, SingleReader = true });
         private readonly ConcurrentDictionary<string, TaskCompletionSource> pending = new();
+        public string CameraSession { get; } = Guid.NewGuid().ToString("N");
+        public bool Active => !lifetime.IsCancellationRequested;
+        public CancellationToken Token => lifetime.Token;
         public Peer(SslStream stream, CancellationToken stop) { this.stream = stream; lifetime = CancellationTokenSource.CreateLinkedTokenSource(stop); }
         public bool Enqueue(Packet packet) => !lifetime.IsCancellationRequested && output.Writer.TryWrite(packet);
         public async Task Command(string name, CancellationToken ct)
