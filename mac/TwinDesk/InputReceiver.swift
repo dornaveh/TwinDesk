@@ -2,6 +2,14 @@ import AppKit
 import CoreGraphics
 
 final class InputReceiver {
+    private let queue: DispatchQueue
+    private var scrollTimer: DispatchSourceTimer?
+    private var verticalScroll = ScrollAxis()
+    private var horizontalScroll = ScrollAxis()
+    private var scrollFlags: CGEventFlags = []
+    init(queue: DispatchQueue) { self.queue = queue }
+    deinit { scrollTimer?.cancel() }
+
     private var keys = Set<CGKeyCode>()
     private var buttons = Set<Int>()
     private var navigationButtons = Set<Int>()
@@ -80,11 +88,40 @@ final class InputReceiver {
             postButton(button, down, clicks[button]?.2 ?? 1)
         case "scroll":
             guard let delta = p["delta"] as? Int, (-32768...32768).contains(delta), let horizontal = p["horizontal"] as? Bool else { throw BridgeError.message("Invalid scroll packet.") }
-            let amount = Int32(delta / 40)
-            let event = CGEvent(scrollWheelEvent2Source: source, units: .line, wheelCount: 2, wheel1: horizontal ? 0 : amount, wheel2: horizontal ? amount : 0, wheel3: 0)
-            event?.flags = flags; event?.post(tap: .cghidEventTap)
+            guard delta != 0 else { return }
+            if scrollFlags != flags { stopScrolling() }
+            scrollFlags = flags
+            let now = ProcessInfo.processInfo.systemUptime
+            if horizontal { horizontalScroll.add(delta, now: now) }
+            else { verticalScroll.add(delta, now: now) }
+            if scrollTimer == nil {
+                let timer = DispatchSource.makeTimerSource(queue: queue)
+                timer.schedule(deadline: .now(), repeating: .milliseconds(8), leeway: .milliseconds(1))
+                timer.setEventHandler { [weak self] in self?.scrollTick() }
+                scrollTimer = timer
+                timer.resume()
+            }
         default: throw BridgeError.message("Unknown input action.")
         }
+    }
+    private func scrollTick() {
+        guard active, flags == scrollFlags else { stopScrolling(); return }
+        let now = ProcessInfo.processInfo.systemUptime
+        let y = verticalScroll.step(now: now), x = horizontalScroll.step(now: now)
+        if x != 0 || y != 0 {
+            let event = CGEvent(scrollWheelEvent2Source: source, units: .pixel, wheelCount: 2,
+                                wheel1: y, wheel2: x, wheel3: 0)
+            event?.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+            event?.flags = scrollFlags
+            event?.post(tap: .cghidEventTap)
+        }
+        if !verticalScroll.isMoving && !horizontalScroll.isMoving {
+            scrollTimer?.cancel(); scrollTimer = nil
+        }
+    }
+    private func stopScrolling() {
+        scrollTimer?.cancel(); scrollTimer = nil
+        verticalScroll = ScrollAxis(); horizontalScroll = ScrollAxis()
     }
     private func postButton(_ b: Int, _ down: Bool, _ count: Int64) {
         let type: CGEventType = b == 0 ? (down ? .leftMouseDown : .leftMouseUp) : b == 1 ? (down ? .rightMouseDown : .rightMouseUp) : (down ? .otherMouseDown : .otherMouseUp)
@@ -101,6 +138,7 @@ final class InputReceiver {
     }
     func releaseAll() {
         active = false
+        stopScrolling()
         navigationButtons.removeAll()
         let pressed = keys; keys.removeAll()
         for key in pressed { let e = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false); e?.flags = flags; e?.post(tap: .cghidEventTap) }

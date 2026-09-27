@@ -35,6 +35,8 @@ Use **Start camera feed / Stop camera feed** in the same TwinDesk menu. The came
 
 The Windows key becomes Command; Alt becomes Option. Both Shift keys should work. Input switching and audio forwarding are independent. The helper has no separate menu icon and is launched by the main app.
 
+Mouse-wheel input is smoothed into pixel scrolling over roughly 100 ms, at 36 pixels per standard wheel notch. Fine wheel deltas accumulate instead of being discarded. Pending movement stops on deactivation or modifier changes, and reversing direction cancels the previous direction's remaining movement.
+
 The file-access buttons open the paired PC's configured SMB shares in Finder. Finder uses Windows credentials separately from TwinDesk pairing. Shares must first be configured on Windows; disconnecting TwinDesk does not unmount them.
 
 ## Audio and protected video
