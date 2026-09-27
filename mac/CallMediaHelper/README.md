@@ -35,7 +35,7 @@ It is stored under `~/Library/Application Support/TwinDesk Calls/` with director
 permissions 0700 and file permissions 0600. Never publish or log it.
 
 For automatic login, add `/Applications/TwinDesk-Calls.app` as a login item.
-It accepts `--startup` to hide its initial window. The helper runs without a menu-bar or Dock icon. Choose **Start camera feed** / **Stop camera feed** in the main **TwinDesk** menu; **Camera & microphone settings…** opens its setup window. The camera always starts off after launch or sleep. Microphone permission is remembered, but capture starts only while another Mac process actively uses BlackHole 2ch as an input;
+It accepts `--startup` to hide its initial window. The helper runs without a menu-bar or Dock icon. Choose **Start camera feed** / **Stop camera feed** in the main **TwinDesk** menu; **Camera & microphone settings…** opens its setup window. The camera always starts off after launch or sleep. Microphone permission is remembered. Capture starts while another Mac process actively uses BlackHole 2ch as an input, or while the user has manually started the camera feed; the latter keeps camera and microphone transport paired for calling apps that do not open a virtual microphone until a call begins.
 speaker forwarding is automatic while the helper runs. Keep the regular TwinDesk
 app running as well.
 
@@ -48,6 +48,17 @@ In the Mac calling app choose:
 - **Camera:** OBS Virtual Camera
 - **Microphone:** BlackHole 2ch
 - **Speakers:** normal Mac system output, not BlackHole
+
+FaceTime currently accepts the OBS video but can silence audio from virtual input
+devices even when BlackHole is receiving valid samples. The same failure occurs
+when BlackHole is wrapped in a Core Audio aggregate device. Similar failures are
+[reported for BlackHole](https://github.com/ExistentialAudio/BlackHole/issues/526)
+and [documented by another virtual-mic vendor](https://support.voicemod.net/hc/en-us/articles/22169835107090--macOS-How-to-Use-Voicemod-with-FaceTime-or-any-Communication-Apps-Without-Built-in-Audio-Settings).
+This is an app/macOS voice-processing limitation,
+not a lost TwinDesk network stream. For FaceTime, use an iPhone through Continuity
+[Continuity Camera](https://support.apple.com/guide/iphone/use-iphone-as-a-webcam-iph5b912c30c/ios)
+or a directly connected microphone. Other calling apps still need an
+end-to-end microphone check before relying on them.
 
 Calls sends microphone audio only to BlackHole and captures only the normal
 speaker output while excluding its own process. This avoids returning microphone
@@ -64,4 +75,4 @@ A calling service may independently reduce outgoing resolution.
 ## Validation
 
 The Mac helper builds; synthetic 1080p frames were submitted to the enabled OBS
-sink, and BlackHole output opened at 48kHz stereo. Microphone demand detection passed a separate-process input open/close test. Windows defaults camera/microphone demand to off; manual camera Start sends an explicit demand message. Stop drops queued media and closes the camera connection. The installed single-menu Start command received live 720p frames from Windows; Stop closed the camera connection and left capture off. Main control and speaker audio reconnected after the coordinated update. A real calling-app preview/call still needs user verification before claiming end-to-end calling compatibility.
+sink, and BlackHole output opened at 48kHz stereo. Microphone demand detection passed a separate-process input open/close test. Windows defaults camera/microphone demand to off; manual camera Start sends explicit camera and microphone demand messages. Stop drops queued camera media and closes the camera connection. The installed single-menu Start command received live 720p frames from Windows, and FaceTime displayed that video. During a live microphone test, TwinDesk received PC mic audio and rendered a full BlackHole buffer with non-silent levels, while FaceTime's own audio diagnostics remained at silence. Main control and speaker audio reconnected after the coordinated update. Other calling apps still need user verification before claiming end-to-end microphone compatibility.

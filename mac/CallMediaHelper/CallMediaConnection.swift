@@ -29,6 +29,7 @@ final class CallMediaConnection {
     private var generation = 0
     private var heartbeatPending = false
     private var bootstrapping = false
+    private var lastMicrophoneLevelReport = 0.0
 
     init(_ medium: Medium) {
         self.medium = medium
@@ -158,7 +159,17 @@ final class CallMediaConnection {
         if medium != .speakers && !demand { return } // Discard packets already in flight after demand stops.
         guard enabled else { throw BridgeError.message("PC sent media while forwarding was disabled.") }
         if medium == .camera && kind == 8 { try camera.send(jpeg: data) }
-        else if medium == .microphone && kind == 2 { try microphone.receive(data) }
+        else if medium == .microphone && kind == 2 {
+            let levels = try microphone.receive(data)
+            let now = ProcessInfo.processInfo.systemUptime
+            if now - lastMicrophoneLevelReport >= 1 {
+                lastMicrophoneLevelReport = now
+                func level(_ peak: Float) -> String {
+                    peak > 0 ? "\(Int((20 * log10(peak)).rounded())) dBFS" : "silence"
+                }
+                report?("PC mic \(level(levels.received)) · BlackHole \(level(levels.rendered)) · buffer \(levels.renderedSamples)/\(levels.requestedSamples)")
+            }
+        }
         else { throw BridgeError.message("Unexpected media packet.") }
         lastMedia = ProcessInfo.processInfo.systemUptime
         if !announced {

@@ -89,7 +89,11 @@ import OSLog
     }
     private func updateDemand() {
         video.setDemand(cameraEnabled)
-        mic.setDemand(microphoneEnabled && demandMonitor.microphoneInUse())
+        // FaceTime may not open a virtual microphone while showing its camera
+        // preview. Starting the camera is an explicit request for call media, so
+        // keep its paired microphone live as well. Other apps still activate the
+        // microphone automatically when they open BlackHole.
+        mic.setDemand(microphoneEnabled && (cameraEnabled || demandMonitor.microphoneInUse()))
     }
     func toggleCamera() {
         guard running else { return }

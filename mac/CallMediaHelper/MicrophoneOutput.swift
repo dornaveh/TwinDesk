@@ -10,6 +10,9 @@ final class MicrophoneOutput {
     private var ring = [Float](repeating: 0, count: 3840) // 40 ms stereo, oldest frames dropped
     private var readIndex = 0
     private var count = 0
+    private var lastRenderedPeak: Float = 0
+    private var lastRenderedSamples = 0
+    private var lastRequestedSamples = 0
 
     private func check(_ status: OSStatus, _ operation: String) throws {
         if status != noErr { throw BridgeError.message("\(operation) failed (\(status)). Check BlackHole 2ch installation.") }
@@ -59,38 +62,51 @@ final class MicrophoneOutput {
             try check(AudioOutputUnitStart(instance), "Start microphone output")
         } catch { stop(); throw error }
     }
-    func receive(_ data: Data) throws {
+    @discardableResult func receive(_ data: Data) throws -> (received: Float, rendered: Float, renderedSamples: Int, requestedSamples: Int) {
         guard !data.isEmpty, data.count <= 19200, data.count % 4 == 0 else { throw BridgeError.message("Invalid microphone audio packet.") }
         try start()
         lock.lock(); defer { lock.unlock() }
         // Keep the newest 40 ms even when packets arrive in bursts.
         let bytes = data.suffix(ring.count * 2)
         let samples = bytes.count / 2
+        var peak: Float = 0
         let overflow = max(0, count + samples - ring.count)
         readIndex = (readIndex + overflow) % ring.count; count -= overflow
         bytes.withUnsafeBytes { raw in
             for i in 0..<samples {
                 let value = Int16(littleEndian: raw.loadUnaligned(fromByteOffset: i * 2, as: Int16.self))
-                ring[(readIndex + count) % ring.count] = Float(value) / 32768
+                let sample = Float(value) / 32768
+                peak = max(peak, abs(sample))
+                ring[(readIndex + count) % ring.count] = sample
                 count += 1
             }
         }
+        return (peak, lastRenderedPeak, lastRenderedSamples, lastRequestedSamples)
     }
     private func render(_ list: UnsafeMutablePointer<AudioBufferList>) {
         // No allocation or blocking on the audio callback; contention yields silence.
         let buffers = UnsafeMutableAudioBufferListPointer(list)
         for buffer in buffers { if let base = buffer.mData { memset(base, 0, Int(buffer.mDataByteSize)) } }
         guard lock.try() else { return }; defer { lock.unlock() }
+        lastRenderedPeak = 0
+        lastRenderedSamples = 0
+        lastRequestedSamples = buffers.reduce(0) { $0 + Int($1.mDataByteSize) / 4 }
         guard buffers.count == 1, buffers[0].mNumberChannels == 2, let base = buffers[0].mData else { return }
         let output = base.assumingMemoryBound(to: Float.self)
         let length = min(Int(buffers[0].mDataByteSize) / 4, count) / 2 * 2
-        for i in 0..<length { output[i] = ring[(readIndex + i) % ring.count] }
+        for i in 0..<length {
+            output[i] = ring[(readIndex + i) % ring.count]
+            lastRenderedPeak = max(lastRenderedPeak, abs(output[i]))
+        }
+        lastRenderedSamples = length
         readIndex = (readIndex + length) % ring.count; count -= length
     }
     func stop() {
         if let unit { AudioOutputUnitStop(unit); AudioUnitUninitialize(unit); AudioComponentInstanceDispose(unit) }
         unit = nil
-        lock.lock(); count = 0; readIndex = 0; lock.unlock()
+        lock.lock()
+        count = 0; readIndex = 0; lastRenderedPeak = 0; lastRenderedSamples = 0; lastRequestedSamples = 0
+        lock.unlock()
     }
     deinit { stop() }
 }
