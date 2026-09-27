@@ -31,7 +31,9 @@ Ad hoc rebuilds can require granting permissions again. If input is unavailable 
 
 Use the Windows shortcuts documented in the root README. The Mac menu-bar dropdown also offers **Switch back to Windows** when connected to a compatible Windows companion. Monitor switching is requested through Windows during normal operation; Mac display-helper support remains experimental and connection-dependent.
 
-The Windows key becomes Command; Alt becomes Option. Both Shift keys should work. Input switching and audio forwarding are independent. The same TwinDesk menu provides **Start camera feed** / **Stop camera feed** and automatic PC microphone permission. The helper has no separate menu icon and is launched by the main app.
+Use **Start camera feed / Stop camera feed** in the same TwinDesk menu. The camera defaults off on launch and after sleep. Enable **Use PC microphone automatically** to forward the microphone only while a Mac app uses BlackHole 2ch. Calling apps select OBS Virtual Camera and BlackHole 2ch. OBS and BlackHole are optional for speaker-only use.
+
+The Windows key becomes Command; Alt becomes Option. Both Shift keys should work. Input switching and audio forwarding are independent. The helper has no separate menu icon and is launched by the main app.
 
 The file-access buttons open the paired PC's configured SMB shares in Finder. Finder uses Windows credentials separately from TwinDesk pairing. Shares must first be configured on Windows; disconnecting TwinDesk does not unmount them.
 
@@ -41,7 +43,7 @@ Audio capture currently requires a 48 kHz stereo Float32 output format, then sen
 
 The tap suppresses local Mac playback while capture is running. Stopping the tap removes that suppression; it does not change an independent macOS mute setting. If you want the built-in speaker always silent, configure that separately in macOS Sound settings.
 
-Protected playback such as Apple TV can behave differently with capture or display connections. Compatibility is not guaranteed. If video is black, stop audio forwarding and disconnect TwinDesk before testing playback again; if video remains black, investigate the display/HDCP path separately. Audio-only capture avoids screen capture but is not a way to bypass content protection.
+Protected playback such as Apple TV can behave differently with capture or display connections. Compatibility is not guaranteed. If video is black, quit TwinDesk (which also stops its helper) before testing playback again; if video remains black, investigate the display/HDCP path separately. Audio-only capture avoids screen capture but is not a way to bypass content protection.
 
 ## Optional login startup
 
@@ -51,7 +53,7 @@ After building and quitting any running installed TwinDesk app:
 zsh "mac/Install-Login-Startup.command"
 ```
 
-This copies the main build into `/Applications`, backs up an existing installation under `mac/previous-install`, and registers `~/Library/LaunchAgents/local.twindesk.login.plist` for the current user. Install the Calls helper separately as described above. It opens TwinDesk at graphical sign-in, not before login; TwinDesk launches the installed helper. Both can reconnect using their saved pairing. Installing a changed ad hoc build may require granting permissions again.
+This verifies and copies both builds into `/Applications`, backs up existing installations under `mac/previous-install`, and registers `~/Library/LaunchAgents/local.twindesk.login.plist` for the current user. Both apps must be closed before installation. It opens TwinDesk at graphical sign-in, not before login; TwinDesk launches the installed helper. Both can reconnect using their saved pairing. Installing a changed ad hoc build may require granting permissions again.
 
 To remove automatic startup, unload the agent and remove its plist:
 

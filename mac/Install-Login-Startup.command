@@ -4,20 +4,29 @@ set -euo pipefail
 project_root="$(cd "$(dirname "$0")" && pwd)"
 source_app="$project_root/dist/TwinDesk.app"
 installed_app="/Applications/TwinDesk.app"
+source_helper="$project_root/CallMediaHelper/dist/TwinDesk-Calls.app"
+installed_helper="/Applications/TwinDesk-Calls.app"
 backup_dir="$project_root/previous-install"
 agent="$HOME/Library/LaunchAgents/local.twindesk.login.plist"
 
 test -d "$source_app" || { echo "Build TwinDesk on this Mac first." >&2; exit 1; }
-if /usr/bin/pgrep -f '^/Applications/TwinDesk.app/Contents/MacOS/TwinDesk' >/dev/null; then
+test -d "$source_helper" || { echo "Build TwinDesk Calls first." >&2; exit 1; }
+if /usr/bin/pgrep -f '^/Applications/TwinDesk(-Calls)?.app/Contents/MacOS/TwinDesk' >/dev/null; then
   echo "The old TwinDesk app is still running; close it before installing." >&2
   exit 1
 fi
 
 codesign --verify --deep --strict "$source_app"
+codesign --verify --deep --strict "$source_helper"
 mkdir -p "$backup_dir" "$HOME/Library/LaunchAgents"
 if test -d "$installed_app"; then
   mv "$installed_app" "$backup_dir/TwinDesk-$(date +%Y%m%d-%H%M%S).app"
 fi
+if test -d "$installed_helper"; then
+  mv "$installed_helper" "$backup_dir/TwinDesk-Calls-$(date +%Y%m%d-%H%M%S).app"
+fi
+ditto "$source_helper" "$installed_helper"
+codesign --verify --deep --strict "$installed_helper"
 ditto "$source_app" "$installed_app"
 codesign --verify --deep --strict "$installed_app"
 
