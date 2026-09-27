@@ -41,7 +41,7 @@ public sealed class BridgeServer : IAsyncDisposable
         if (ip.AddressFamily != AddressFamily.InterNetwork || ip.Equals(IPAddress.Any)) throw new ArgumentException("Select one IPv4 address for this PC.");
         listener = new TcpListener(ip, port); this.identity = identity;
     }
-    public void Start() { listener.Start(4); acceptTask = AcceptLoop(); }
+    public void Start() { listener.Start(4); acceptTask = Task.Run(AcceptLoop); }
     private async Task AcceptLoop()
     {
         try

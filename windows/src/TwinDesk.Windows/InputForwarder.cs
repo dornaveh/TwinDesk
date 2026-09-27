@@ -11,6 +11,7 @@ public sealed class InputForwarder : IDisposable
     private readonly Hook keyboardProc, mouseProc;
     private nint keyboardHook, mouseHook;
     private readonly KeyboardState keys = new();
+    private readonly InputReplayQueue replay = new();
     private readonly MiddleClickGesture middle = new(SystemInformation.DoubleClickTime,
         Math.Max(1, SystemInformation.DoubleClickSize.Width / 2), Math.Max(1, SystemInformation.DoubleClickSize.Height / 2));
     private readonly System.Windows.Forms.Timer middleTimer = new() { Interval = 15 };
@@ -40,7 +41,7 @@ public sealed class InputForwarder : IDisposable
         {
             // Release modifiers already pressed on Windows before suppressing input.
             var release = keys.Held.Select(v => new NativeInput { Type = 1, Key = new KeyInput { Vk = (ushort)v, Flags = 2, Extra = KeyboardState.OwnInputTag } }).ToArray();
-            if (release.Length > 0) SendInput((uint)release.Length, release, Marshal.SizeOf<NativeInput>());
+            if (release.Length > 0) replay.Enqueue(() => SendInput((uint)release.Length, release, Marshal.SizeOf<NativeInput>()));
             GetCursorPos(out anchor);
         }
         Remote = remote;
@@ -71,7 +72,7 @@ public sealed class InputForwarder : IDisposable
     {
         if (code < 0) return CallNextHookEx(0, code, message, pointer);
         var m = Marshal.PtrToStructure<MouseData>(pointer);
-        if (!MiddleClickGesture.IsPhysical(m.Flags)) return CallNextHookEx(0, code, message, pointer);
+        if (m.Extra == MouseInputTag || !MiddleClickGesture.IsPhysical(m.Flags)) return CallNextHookEx(0, code, message, pointer);
         var wasPending = middle.Pending;
         ApplyMiddle(middle.Advance(Environment.TickCount64));
         if (message == 0x200 && (wasPending || middle.Pending))
@@ -119,6 +120,7 @@ public sealed class InputForwarder : IDisposable
         if (keyboardHook != 0) UnhookWindowsHookEx(keyboardHook);
         if (mouseHook != 0) UnhookWindowsHookEx(mouseHook);
         keyboardHook = mouseHook = 0;
+        replay.Dispose();
     }
     private void ApplyMiddle(IReadOnlyList<MiddleAction> actions)
     {
@@ -147,7 +149,9 @@ public sealed class InputForwarder : IDisposable
         if (Remote) Forward?.Invoke(JsonSerializer.SerializeToUtf8Bytes(new { kind = "button", button = 2, down = false }));
         else ReplayMouse(0x40);
     }
-    private static void ReplayMouse(uint flags, int dx = 0, int dy = 0)
+    private void ReplayMouse(uint flags, int dx = 0, int dy = 0) =>
+        replay.Enqueue(() => InjectMouse(flags, dx, dy));
+    private static void InjectMouse(uint flags, int dx, int dy)
     {
         if (flags == 0x1)
         {
