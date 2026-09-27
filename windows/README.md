@@ -51,7 +51,7 @@ Open **Camera & mic** in the window or tray menu. Select the webcam and micropho
 and allow each device independently. These permissions and device selections
 are remembered, but capture stays idle until the authenticated Mac requests it.
 Start and stop the camera feed from the Mac menu. Microphone capture starts
-when a Mac app uses the BlackHole input and stops when that demand ends.
+when a Mac app uses TwinDesk Microphone and stops when that demand ends.
 Disconnecting the receiver also stops capture.
 
 The default camera profile requests native 1280×720 at 30 fps; 1920×1080 at
