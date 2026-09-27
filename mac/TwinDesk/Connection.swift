@@ -51,7 +51,7 @@ final class Connection {
     private var timer: DispatchSourceTimer?
     private var pairing: Pairing?
     private var routes = [DisplayRoute]()
-    private lazy var input = InputReceiver(queue: queue)
+    private let input = InputReceiver()
     private var receiving = Data()
     private var wanted = false
     private var ready = false
