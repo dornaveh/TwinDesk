@@ -103,8 +103,8 @@ WhatsApp for Mac 26.36.74 skips Core Audio devices whose transport is Virtual
 or Aggregate. TwinDesk Microphone now reports RemoteStreaming, describing its
 network source. After installing this version and reopening WhatsApp, the
 "no connected microphone" error no longer prevented a call from opening.
-That checks recognition; successful microphone audio in a WhatsApp call still
-needs a separate voice-only test. Changing the transport does not add a device,
+The user subsequently confirmed successful microphone audio in WhatsApp.
+Changing the transport does not add a device,
 change its UID, or grant a new capture permission.
 
 Native WhatsApp video is not working in this setup. With the PC feed already
@@ -121,6 +121,15 @@ See the [OBS camera-device implementation](https://github.com/obsproject/obs-stu
 and [stream-format implementation](https://github.com/obsproject/obs-studio/blob/32.2.2/plugins/mac-virtualcam/src/camera-extension/OBSCameraStreamSource.swift).
 The failed manual-feed test was ended and automatic microphone-triggered
 camera mode restored.
+
+FaceTime later repeatedly rebuilt its audio-device list and reported "Call
+Failed". Reloading the audio driver cleared the selection loop; restoring
+automatic camera mode was followed by a successful user-confirmed FaceTime
+call. The RemoteStreaming transport was retained. A trial legacy
+JackIsConnected handler did not expose that property through the public HAL
+and was removed from source, so it is not credited as the fix. The installed
+trial bundle contains that unused handler; it can be replaced during the next
+normal driver update without changing the working setup now.
 
 Automatic mode was checked with a separate microphone consumer: opening the
 virtual input started live 720p video and non-silent PC microphone audio;
