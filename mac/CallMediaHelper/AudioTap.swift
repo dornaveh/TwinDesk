@@ -10,6 +10,9 @@ final class AudioTap {
     private var tap: AudioObjectID = 0
     private var device: AudioObjectID = 0
     private var io: AudioDeviceIOProcID?
+    private var route: AudioTapRoute?
+    private var tapUID = ""
+    private var aggregateUID = ""
     private let queue = DispatchQueue(label: "TwinDesk.core-audio")
     private lazy var outputVolume = OutputVolume(queue: queue)
     private var lastReport = 0.0
@@ -23,6 +26,25 @@ final class AudioTap {
         var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
         var size = UInt32(MemoryLayout<T>.size)
         try check(withUnsafeMutablePointer(to: &value) { AudioObjectGetPropertyData(object, &address, 0, nil, &size, $0) }, "Read audio property")
+    }
+    private func uid(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector) -> String? {
+        guard object != 0 else { return nil }
+        var value: CFString = "" as CFString
+        guard (try? read(object, selector, into: &value)) != nil else { return nil }
+        return value as String
+    }
+    // Called on the speaker connection queue. Silent playback is healthy: only
+    // missing/replaced objects or a changed default output require rebuilding.
+    func ensureRunning() throws -> Bool {
+        var output = AudioObjectID(0)
+        try read(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultOutputDevice, into: &output)
+        if let route, route.matches(outputID: output,
+            outputUID: uid(output, kAudioDevicePropertyDeviceUID),
+            tapUID: uid(tap, kAudioTapPropertyUID),
+            aggregateUID: uid(device, kAudioDevicePropertyDeviceUID)) { return false }
+        stop()
+        _ = try start()
+        return true
     }
     func start() throws -> String {
         guard tap == 0 else { return "Already running" }
@@ -47,7 +69,12 @@ final class AudioTap {
             description.name = "TwinDesk system audio"
             description.isPrivate = true
             description.muteBehavior = .mutedWhenTapped
+            tapUID = description.uuid.uuidString
             try check(AudioHardwareCreateProcessTap(description, &tap), "Create audio tap")
+            guard let actualTapUID = uid(tap, kAudioTapPropertyUID) else {
+                throw TapFailure(message: "Cannot identify the speaker audio tap.")
+            }
+            tapUID = actualTapUID
             var format = AudioStreamBasicDescription()
             try read(tap, kAudioTapPropertyFormat, into: &format)
             guard format.mFormatID == kAudioFormatLinearPCM,
@@ -56,9 +83,10 @@ final class AudioTap {
                   format.mSampleRate == 48000 else {
                 throw TapFailure(message: "TwinDesk currently requires a 48 kHz stereo output. The current audio format is unsupported.")
             }
+            aggregateUID = UUID().uuidString
             let config: [String: Any] = [
                 kAudioAggregateDeviceNameKey: "TwinDesk Audio (temporary)",
-                kAudioAggregateDeviceUIDKey: UUID().uuidString,
+                kAudioAggregateDeviceUIDKey: aggregateUID,
                 kAudioAggregateDeviceIsPrivateKey: true,
                 kAudioAggregateDeviceMainSubDeviceKey: outputUID,
                 kAudioAggregateDeviceSubDeviceListKey: [[kAudioSubDeviceUIDKey: outputUID]],
@@ -92,14 +120,19 @@ final class AudioTap {
                 }
             }, "Create audio callback")
             try check(AudioDeviceStart(device, io), "Start audio-only capture")
+            route = AudioTapRoute(outputID: output, outputUID: outputUID as String,
+                tapUID: tapUID, aggregateUID: aggregateUID)
             return "Capturing audio only · \(Int(format.mSampleRate)) Hz · \(format.mChannelsPerFrame) channels"
         } catch { stop(); throw error }
     }
     func stop() {
-        if let io { AudioDeviceStop(device, io); AudioDeviceDestroyIOProcID(device, io) }
+        // Never destroy an unrelated object that reused an ID after a reset.
+        let ownsDevice = !aggregateUID.isEmpty && uid(device, kAudioDevicePropertyDeviceUID) == aggregateUID
+        if let io, ownsDevice { AudioDeviceStop(device, io); AudioDeviceDestroyIOProcID(device, io) }
         io = nil
-        if device != 0 { AudioHardwareDestroyAggregateDevice(device); device = 0 }
-        if tap != 0 { AudioHardwareDestroyProcessTap(tap); tap = 0 }
+        if ownsDevice { AudioHardwareDestroyAggregateDevice(device) }
+        if !tapUID.isEmpty && uid(tap, kAudioTapPropertyUID) == tapUID { AudioHardwareDestroyProcessTap(tap) }
+        device = 0; tap = 0; route = nil; tapUID = ""; aggregateUID = ""
         outputVolume.stop()
     }
     deinit { stop() }

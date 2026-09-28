@@ -58,6 +58,13 @@ It stops them when that app releases the input, normally within a second.
 Speaker forwarding continues independently. The saved automatic preference
 survives launch and sleep; manual camera sessions end on sleep.
 
+Speaker forwarding checks its audio route every two seconds. If the default
+Mac output changes or Core Audio resets, the helper recreates its audio-only
+tap and volume monitoring without restarting TwinDesk or reconnecting call
+inputs. Object UIDs are checked as well as numeric IDs, so a reset cannot make
+cleanup destroy an unrelated device whose ID was recycled. Temporary local
+audio failures are shown in the menu and retried automatically.
+
 This mode follows microphone use, not independent camera use. A camera-only
 preview or a call using another microphone still needs **Start camera feed**.
 Manual **Start camera feed** and **Stop camera feed** turn off automatic camera
@@ -127,9 +134,9 @@ Failed". Reloading the audio driver cleared the selection loop; restoring
 automatic camera mode was followed by a successful user-confirmed FaceTime
 call. The RemoteStreaming transport was retained. A trial legacy
 JackIsConnected handler did not expose that property through the public HAL
-and was removed from source, so it is not credited as the fix. The installed
-trial bundle contains that unused handler; it can be replaced during the next
-normal driver update without changing the working setup now.
+and was removed from source, so it is not credited as the fix. The audio reset
+also invalidated the helper's speaker tap while its PC connection still showed
+active. Automatic route recovery now handles this case.
 
 Automatic mode was checked with a separate microphone consumer: opening the
 virtual input started live 720p video and non-silent PC microphone audio;

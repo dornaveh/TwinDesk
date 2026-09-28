@@ -96,6 +96,17 @@ final class CallMediaConnection {
             guard let self else { return }
             let now = ProcessInfo.processInfo.systemUptime
             if now - self.lastPacket > 8 { self.failed("PC \(self.medium.rawValue) timed out. Reconnecting…"); return }
+            if self.medium == .speakers && self.ready && self.enabled {
+                do {
+                    if try self.audio.ensureRunning() {
+                        self.report?("Mac speaker audio forwarding restored.")
+                    }
+                } catch {
+                    // Keep TLS and call inputs alive while the audio service or
+                    // selected output is temporarily unavailable. Retry locally.
+                    self.report?("Speaker audio unavailable: \(error.localizedDescription) Retrying automatically…")
+                }
+            }
             if self.ready && !self.heartbeatPending { self.heartbeatPending = true; self.send(5, Data()) }
             if self.announced && now - self.lastMedia > 2 {
                 self.stopOutput(); self.announced = false; self.report?("Waiting for PC \(self.medium.rawValue)…")
@@ -156,7 +167,13 @@ final class CallMediaConnection {
                   let message = status["message"] as? String, message.count <= 2048 else { throw BridgeError.message("Invalid media status.") }
             self.enabled = enabled
             if !enabled { stopOutput(); announced = false }
-            if enabled && medium == .speakers { _ = try audio.start() }
+            if enabled && medium == .speakers {
+                do { _ = try audio.ensureRunning() }
+                catch {
+                    report?("Speaker audio unavailable: \(error.localizedDescription) Retrying automatically…")
+                    return
+                }
+            }
             report?(enabled && medium != .speakers && !demand
                 ? "\(medium.rawValue.capitalized) idle · waiting for a calling app." : message)
             return
