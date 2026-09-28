@@ -592,7 +592,11 @@ static OSStatus GetPropertyData(AudioServerPlugInDriverRef inDriver, AudioObject
                 case kAudioObjectPropertyControlList:
                     *outDataSize = 0; return noErr;
                 case kAudioDevicePropertyTransportType:
-                    TWINDESK_WRITE_SCALAR(UInt32, kAudioDeviceTransportTypeVirtual);
+                    // This input carries a real PC microphone over the network.
+                    // WhatsApp for Mac skips Virtual and Aggregate transports
+                    // before checking input streams. RemoteStreaming describes
+                    // the source without pretending it is local USB hardware.
+                    TWINDESK_WRITE_SCALAR(UInt32, kAudioDeviceTransportTypeRemoteStreaming);
                 case kAudioDevicePropertyRelatedDevices:
                     if (inDataSize >= sizeof(AudioObjectID)) {
                         *((AudioObjectID *)outData) = kObjectID_Device;

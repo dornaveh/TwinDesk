@@ -97,6 +97,31 @@ live FaceTime call at 48 kHz stereo. Keyboard/mouse control and automatic
 speaker forwarding remained connected. Other calling apps should be checked
 once before relying on them.
 
+### Native WhatsApp limitations (2026-09-27)
+
+WhatsApp for Mac 26.36.74 skips Core Audio devices whose transport is Virtual
+or Aggregate. TwinDesk Microphone now reports RemoteStreaming, describing its
+network source. After installing this version and reopening WhatsApp, the
+"no connected microphone" error no longer prevented a call from opening.
+That checks recognition; successful microphone audio in a WhatsApp call still
+needs a separate voice-only test. Changing the transport does not add a device,
+change its UID, or grant a new capture permission.
+
+Native WhatsApp video is not working in this setup. With the PC feed already
+receiving live video, WhatsApp selected a 1280×720 NV12 capture format and its
+AVFoundation capture graph failed with OSStatus -12780. OBS's installed camera
+extension advertises a single 1920×1080 BGRA format. A format compatibility
+problem is suspected, but has not been proved by testing another extension.
+Reducing the incoming Windows video to 720p does not change the format that
+OBS advertises to Mac apps. Do not claim native WhatsApp video support based
+on the working FaceTime or browser tests. Camera and microphone permissions
+were already allowed; repeated permission resets are not the remedy.
+
+See the [OBS camera-device implementation](https://github.com/obsproject/obs-studio/blob/32.2.2/plugins/mac-virtualcam/src/camera-extension/OBSCameraDeviceSource.swift)
+and [stream-format implementation](https://github.com/obsproject/obs-studio/blob/32.2.2/plugins/mac-virtualcam/src/camera-extension/OBSCameraStreamSource.swift).
+The failed manual-feed test was ended and automatic microphone-triggered
+camera mode restored.
+
 Automatic mode was checked with a separate microphone consumer: opening the
 virtual input started live 720p video and non-silent PC microphone audio;
 releasing it stopped the camera and left the OBS device idle. Policy tests
