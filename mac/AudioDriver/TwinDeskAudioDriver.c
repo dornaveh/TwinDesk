@@ -122,7 +122,8 @@ static Boolean EnsureRingMapped(void) {
         return false;
     }
     struct stat info;
-    if (fstat(fd, &info) != 0 || info.st_size != (off_t)sizeof(TwinDeskAudioRing)) {
+    // macOS rounds POSIX shared-memory sizes up to a VM page boundary.
+    if (fstat(fd, &info) != 0 || info.st_size < (off_t)sizeof(TwinDeskAudioRing)) {
         os_log_error(gLog, "audio ring has an invalid size");
         close(fd);
         return false;

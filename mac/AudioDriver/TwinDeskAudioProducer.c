@@ -25,7 +25,13 @@ int twindesk_mic_open(void) {
     // The driver runs as _coreaudiod in a separate sandbox. Match the proven
     // AudioServerPlugIn pattern: make this audio-only ring accessible to that
     // process after creation, regardless of the app's umask.
+    // Darwin does not support fchmod on POSIX shared-memory descriptors. Set
+    // permissions at creation, then immediately restore the process umask.
+    mode_t previousMask = umask(0);
     int fd = shm_open(TWINDESK_AUDIO_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0666);
+    int openError = errno;
+    umask(previousMask);
+    errno = openError;
     if (fd >= 0) {
         // macOS permits sizing a POSIX shared-memory object only on creation.
         if (ftruncate(fd, (off_t)sizeof(TwinDeskAudioRing)) != 0) {
@@ -48,19 +54,19 @@ int twindesk_mic_open(void) {
             return result;
         }
     }
-    // The mode argument is masked by umask. Core Audio runs as _coreaudiod and
-    // needs read/write access to advance the consumer cursor.
-    if (fchmod(fd, 0666) != 0) {
-        int result = errno;
-        close(fd);
-        pthread_mutex_unlock(&gProducerMutex);
-        return result;
-    }
     struct stat info;
-    if (fstat(fd, &info) != 0 || info.st_size != (off_t)sizeof(TwinDeskAudioRing)) {
+    // macOS rounds POSIX shared-memory sizes up to a VM page boundary.
+    if (fstat(fd, &info) != 0 || info.st_size < (off_t)sizeof(TwinDeskAudioRing)) {
         close(fd);
         pthread_mutex_unlock(&gProducerMutex);
         return EINVAL;
+    }
+    // Do not silently accept an older restrictive ring: Core Audio runs as
+    // _coreaudiod and must be able to advance the consumer cursor.
+    if ((info.st_mode & 0666) != 0666) {
+        close(fd);
+        pthread_mutex_unlock(&gProducerMutex);
+        return EACCES;
     }
     void *mapping = mmap(NULL, sizeof(TwinDeskAudioRing), PROT_READ | PROT_WRITE,
                          MAP_SHARED, fd, 0);

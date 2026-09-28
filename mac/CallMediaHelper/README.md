@@ -52,11 +52,26 @@ In a Mac calling app select:
 - **Microphone:** TwinDesk Microphone
 - **Speakers:** the normal Mac output
 
-Use **Start camera feed** and **Stop camera feed** in the main TwinDesk menu.
-The camera starts off after launch and sleep. The PC microphone activates when
-an app opens TwinDesk Microphone; starting the camera also keeps microphone
-transport ready for apps that open their microphone only after a call begins.
-Speaker forwarding runs automatically while the helper is connected.
+**Use PC camera automatically with microphone** is enabled by default. When a
+Mac app opens TwinDesk Microphone, TwinDesk starts the PC camera and microphone.
+It stops them when that app releases the input, normally within a second.
+Speaker forwarding continues independently. The saved automatic preference
+survives launch and sleep; manual camera sessions end on sleep.
+
+This mode follows microphone use, not independent camera use. A camera-only
+preview or a call using another microphone still needs **Start camera feed**.
+Manual **Start camera feed** and **Stop camera feed** turn off automatic camera
+mode, so Stop always takes effect during a call. Enable the automatic toggle
+again to return to call-triggered capture. Apps that keep their microphone open
+after a call also keep the camera active until they release it; manual Stop is
+always available. Muting inside a calling app may leave its input open.
+
+The camera policy observes Core Audio process input usage and excludes TwinDesk
+Calls itself. It never treats received microphone packets or its own OBS feed
+as demand. OBS's public device-running flag includes TwinDesk's sink stream, so
+that flag cannot independently identify camera consumers. See the
+[OBS source](https://github.com/obsproject/obs-studio/blob/32.2.2/plugins/mac-virtualcam/src/camera-extension/OBSCameraDeviceSource.swift)
+and [Apple's device-running property](https://developer.apple.com/documentation/coremediaio/kcmiodevicepropertydeviceisrunningsomewhere).
 
 The helper deliberately excludes its own microphone playback from the speaker
 stream, preventing the caller's audio from being sent back to the PC as
@@ -81,3 +96,10 @@ Virtual Camera. TwinDesk Microphone delivered the PC webcam's microphone to a
 live FaceTime call at 48 kHz stereo. Keyboard/mouse control and automatic
 speaker forwarding remained connected. Other calling apps should be checked
 once before relying on them.
+
+Automatic mode was checked with a separate microphone consumer: opening the
+virtual input started live 720p video and non-silent PC microphone audio;
+releasing it stopped the camera and left the OBS device idle. Policy tests
+cover manual Stop during an active call, disallowed microphone forwarding, and
+sleep. Audio-producer tests cover creation with a restrictive umask, page-rounded
+shared-memory sizes, PCM conversion and reopening the existing region.

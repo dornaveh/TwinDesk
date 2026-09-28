@@ -47,7 +47,7 @@ public sealed class MediaSharingForm : Form
                 cameraStatus.Text = "Paste this code into TwinDesk Calls on the Mac. Keep it private; it authorizes media sharing.";
             } catch (Exception e) { cameraStatus.Text = e.Message; }
         };
-        layout.Controls.Add(new Label { Text = "On the Mac, select OBS Virtual Camera and TwinDesk Microphone in your calling app.\nStart/stop the camera from the Mac menu. The microphone runs only while a Mac app uses it. Your device choices and permissions are remembered.", AutoSize = true, MaximumSize = new Size(550, 0) });
+        layout.Controls.Add(new Label { Text = "On the Mac, select OBS Virtual Camera and TwinDesk Microphone in your calling app.\nAutomatic camera mode follows microphone use. Manual Start/Stop is also available in the Mac menu. Your device choices and permissions are remembered.", AutoSize = true, MaximumSize = new Size(550, 0) });
         shareCamera.CheckedChanged += (_, _) => {
             if (restoring) return;
             if (shareCamera.Checked && cameras.SelectedItem is not WebcamDevice) { shareCamera.Checked = false; cameraStatus.Text = "Choose a camera first."; return; }

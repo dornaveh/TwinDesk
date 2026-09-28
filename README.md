@@ -27,7 +27,9 @@ FileVault unlock, recovery, or protected Windows desktops.
   1280×720 requesting 30 fps and 1920×1080 requesting 15 fps. The tested USB
   camera delivered about 15 fps in both modes; selecting 30 fps does not
   guarantee it. OBS Virtual Camera supplies video and the bundled TwinDesk
-  Microphone driver supplies audio.
+  Microphone driver supplies audio. Automatic camera mode starts and stops the
+  PC feed when Mac apps open and release TwinDesk Microphone; manual controls
+  remain available for camera-only use.
 
 ## Requirements and cables
 

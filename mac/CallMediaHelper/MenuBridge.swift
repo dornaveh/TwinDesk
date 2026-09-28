@@ -9,6 +9,7 @@ private struct CallCommand: Codable {
 private struct CallStatus: Codable {
     let updated: Date
     let cameraEnabled: Bool
+    let automaticCameraEnabled: Bool
     let microphoneEnabled: Bool
     let videoStatus: String
     let micStatus: String
@@ -24,8 +25,10 @@ extension CallModel {
         guard bytes.count < 2048, let command = try? JSONDecoder().decode(CallCommand.self, from: bytes),
               abs(command.created.timeIntervalSinceNow) < 10 else { return }
         switch command.action {
-        case "startCamera": cameraEnabled = true
-        case "stopCamera": cameraEnabled = false
+        case "startCamera": setManualCamera(true)
+        case "stopCamera": setManualCamera(false)
+        case "enableAutomaticCamera": setAutomaticCamera(true)
+        case "disableAutomaticCamera": setAutomaticCamera(false)
         case "enableMicrophone": microphoneEnabled = true
         case "disableMicrophone": microphoneEnabled = false
         case "quitHelper":
@@ -37,7 +40,7 @@ extension CallModel {
         mediaChanged()
     }
     func publishMenuStatus() {
-        let status = CallStatus(updated: Date(), cameraEnabled: cameraEnabled, microphoneEnabled: microphoneEnabled,
+        let status = CallStatus(updated: Date(), cameraEnabled: cameraEnabled, automaticCameraEnabled: automaticCameraEnabled, microphoneEnabled: microphoneEnabled,
             videoStatus: videoStatus, micStatus: micStatus, speakerStatus: speakerStatus)
         let url = menuDirectory.appendingPathComponent("menu-status.json")
         if let bytes = try? JSONEncoder().encode(status) {

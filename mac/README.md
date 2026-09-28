@@ -48,11 +48,13 @@ Ad hoc rebuilds can require granting permissions again. If input is unavailable 
 
 Use the Windows shortcuts documented in the root README. The Mac menu-bar dropdown also offers **Switch back to Windows** when connected to a compatible Windows companion. Monitor switching is requested through Windows during normal operation; Mac display-helper support remains experimental and connection-dependent.
 
-Use **Start camera feed / Stop camera feed** in the same TwinDesk menu. The
-camera defaults off on launch and after sleep. **Use PC microphone automatically**
-forwards the PC webcam microphone while a Mac app uses TwinDesk Microphone.
-Calling apps select OBS Virtual Camera and TwinDesk Microphone. OBS and the
-TwinDesk audio driver are optional for speaker-only use.
+**Use PC camera automatically with microphone** starts the PC camera when a
+calling app opens TwinDesk Microphone and stops it when the input is released.
+It is enabled by default and requires **Use PC microphone automatically**.
+Calling apps select OBS Virtual Camera and TwinDesk Microphone. **Start camera
+feed / Stop camera feed** remain available for camera-only previews; either
+manual command turns off automatic camera mode until you enable it again.
+OBS and the TwinDesk audio driver are optional for speaker-only use.
 
 The Windows key becomes Command; Alt becomes Option. Both Shift keys should work. Input switching and audio forwarding are independent. The helper has no separate menu icon and is launched by the main app.
 

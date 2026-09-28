@@ -4,6 +4,7 @@ import AppKit
 struct CallStatus: Codable {
     let updated: Date
     let cameraEnabled: Bool
+    let automaticCameraEnabled: Bool?
     let microphoneEnabled: Bool
     let videoStatus: String
     let micStatus: String

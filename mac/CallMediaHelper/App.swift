@@ -11,6 +11,7 @@ import OSLog
     @Published var speakerStatus = "Speaker audio stopped"
     @Published var running = false
     @Published var cameraEnabled = false
+    @Published var automaticCameraEnabled = UserDefaults.standard.object(forKey: "automaticCameraEnabled") as? Bool ?? true
     @Published var microphoneEnabled = UserDefaults.standard.bool(forKey: "microphoneEnabled")
     private var activePairing: Pairing?
     private let logger = Logger(subsystem: "local.twindesk.calls", category: "media")
@@ -19,6 +20,7 @@ import OSLog
     private let speakers = CallMediaConnection(.speakers)
     private var safetyTimer: Timer?
     private let demandMonitor = MediaDemandMonitor()
+    private var cameraPolicy = CameraDemandPolicy(automatic: UserDefaults.standard.object(forKey: "automaticCameraEnabled") as? Bool ?? true)
     private var wakeObservers: [NSObjectProtocol] = []
     private let configURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/TwinDesk Calls/media-pairing.json")
@@ -34,9 +36,9 @@ import OSLog
             Task { @MainActor in
                 guard let self else { return }
                 self.processMenuCommand()
-                self.publishMenuStatus()
-                guard self.running else { return }
+                guard self.running else { self.publishMenuStatus(); return }
                 self.updateDemand()
+                self.publishMenuStatus()
                 guard !self.oldAudioIsOff else { return }
                 self.stop()
                 self.speakerStatus = "Speaker routing conflict detected. TwinDesk setup needs to complete the audio handoff."
@@ -81,6 +83,7 @@ import OSLog
         } catch { videoStatus = error.localizedDescription; logger.error("Setup failed: \(error.localizedDescription, privacy: .public)") }
     }
     func stop() {
+        cameraPolicy.suspend()
         cameraEnabled = false
         video.setDemand(false); mic.setDemand(false)
         video.stop(); mic.stop(); speakers.stop(); running = false
@@ -88,22 +91,36 @@ import OSLog
         if let data = try? Data(contentsOf: configURL), data.count < 8192 { setup = data.base64EncodedString() }
     }
     private func updateDemand() {
-        video.setDemand(cameraEnabled)
-        // Starting the camera is an explicit request for call media, so keep its
-        // paired microphone transport ready too. Apps also activate microphone
-        // transport automatically when they open TwinDesk Microphone.
-        mic.setDemand(microphoneEnabled && (cameraEnabled || demandMonitor.microphoneInUse()))
+        guard running, let pairing = activePairing else { return }
+        let microphoneInUse = demandMonitor.microphoneInUse()
+        let cameraWanted = cameraPolicy.cameraWanted(microphoneAllowed: microphoneEnabled, microphoneInUse: microphoneInUse)
+        video.setDemand(cameraWanted)
+        if cameraWanted != cameraEnabled {
+            cameraEnabled = cameraWanted
+            if cameraWanted { video.start(pairing, session: "") } else { video.stop() }
+        }
+        mic.setDemand(cameraPolicy.microphoneWanted(microphoneAllowed: microphoneEnabled, microphoneInUse: microphoneInUse))
     }
     func toggleCamera() {
         guard running else { return }
-        cameraEnabled.toggle()
+        setManualCamera(!cameraEnabled)
+    }
+    func setManualCamera(_ enabled: Bool) {
+        cameraPolicy.setManual(enabled)
+        automaticCameraEnabled = false
+        UserDefaults.standard.set(false, forKey: "automaticCameraEnabled")
+        mediaChanged()
+    }
+    func setAutomaticCamera(_ enabled: Bool) {
+        cameraPolicy.setAutomatic(enabled)
+        automaticCameraEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "automaticCameraEnabled")
         mediaChanged()
     }
     func mediaChanged() {
         UserDefaults.standard.set(microphoneEnabled, forKey: "microphoneEnabled")
         guard running, let pairing = activePairing else { return }
         updateDemand()
-        if cameraEnabled { video.start(pairing, session: "") } else { video.stop() }
         if microphoneEnabled { mic.start(pairing, session: "") } else { mic.stop() }
     }
 }
@@ -115,12 +132,13 @@ import OSLog
         WindowGroup("TwinDesk Calls", id: "calls") {
             VStack(alignment: .leading, spacing: 14) {
                 Text("PC webcam and microphone").font(.title2)
-                Text("Mac speaker audio flows automatically to the PC. Start and stop the camera feed here. The microphone activates when a Mac app uses TwinDesk Microphone.")
+                Text("The camera and microphone start when a calling app opens TwinDesk Microphone and stop when it releases the input. Mac speaker audio flows automatically to the PC.")
                 SecureField("Call-media setup code from Windows", text: $model.setup).disabled(model.running)
                 HStack {
                     Button("Start", action: model.start).disabled(model.running || model.setup.isEmpty)
                 }
                 Button(model.cameraEnabled ? "Stop camera feed" : "Start camera feed", action: model.toggleCamera).disabled(!model.running)
+                Toggle("Use PC camera automatically with microphone", isOn: Binding(get: { model.automaticCameraEnabled }, set: { model.setAutomaticCamera($0) }))
                 Toggle("Allow PC microphone when an app uses it", isOn: $model.microphoneEnabled).onChange(of: model.microphoneEnabled) { model.mediaChanged() }
                 Text(model.videoStatus)
                 Text(model.micStatus)

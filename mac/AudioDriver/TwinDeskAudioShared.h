@@ -72,7 +72,9 @@ _Static_assert(TWINDESK_AUDIO_BYTES_PER_FRAME ==
 
 /// Shared memory region name. Keep <= 31 chars including the leading '/'.
 /// ("/twindesk.micring" is 20 chars.)
+#ifndef TWINDESK_AUDIO_SHM_NAME
 #define TWINDESK_AUDIO_SHM_NAME "/twindesk.micring"
+#endif
 
 /// Sanity marker so a process can detect an uninitialised / wrong-version region.
 #define TWINDESK_AUDIO_RING_MAGIC   0x54444D52u   // 'TDMR'

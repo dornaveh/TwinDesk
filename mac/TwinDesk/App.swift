@@ -139,6 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Button(calls.state?.cameraEnabled == true ? "Stop camera feed" : "Start camera feed") {
                 calls.send(calls.state?.cameraEnabled == true ? "stopCamera" : "startCamera")
             }
+            Toggle("Use PC camera automatically with microphone", isOn: Binding(get: { calls.state?.automaticCameraEnabled ?? false }, set: { calls.send($0 ? "enableAutomaticCamera" : "disableAutomaticCamera") }))
             Toggle("Use PC microphone automatically", isOn: Binding(get: { calls.state?.microphoneEnabled ?? false }, set: { calls.send($0 ? "enableMicrophone" : "disableMicrophone") }))
             if let state = calls.state { Text(state.videoStatus); Text(state.micStatus) }
             if !calls.error.isEmpty { Text(calls.error) }

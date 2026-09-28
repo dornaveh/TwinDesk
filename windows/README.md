@@ -50,8 +50,9 @@ can select a different runtime directory. Do not commit or share these files.
 Open **Camera & mic** in the window or tray menu. Select the webcam and microphone
 and allow each device independently. These permissions and device selections
 are remembered, but capture stays idle until the authenticated Mac requests it.
-Start and stop the camera feed from the Mac menu. Microphone capture starts
-when a Mac app uses TwinDesk Microphone and stops when that demand ends.
+The Mac's automatic camera mode follows actual use of TwinDesk Microphone, so
+opening that input starts the camera and microphone and releasing it stops both.
+Manual camera Start/Stop remains available in the Mac menu for camera-only use.
 Disconnecting the receiver also stops capture.
 
 The default camera profile requests native 1280×720 at 30 fps; 1920×1080 at

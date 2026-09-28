@@ -54,7 +54,10 @@ final class CallMediaConnection {
         queue.async {
             guard self.medium != .speakers, self.demand != value else { return }
             self.demand = value
-            if !value { self.stopOutput(); self.announced = false }
+            if !value {
+                self.stopOutput(); self.announced = false
+                self.report?("\(self.medium.rawValue.capitalized) idle · waiting for a calling app.")
+            }
             if self.ready { self.sendDemand() }
         }
     }
@@ -154,7 +157,9 @@ final class CallMediaConnection {
             self.enabled = enabled
             if !enabled { stopOutput(); announced = false }
             if enabled && medium == .speakers { _ = try audio.start() }
-            report?(message); return
+            report?(enabled && medium != .speakers && !demand
+                ? "\(medium.rawValue.capitalized) idle · waiting for a calling app." : message)
+            return
         }
         if medium != .speakers && !demand { return } // Discard packets already in flight after demand stops.
         guard enabled else { throw BridgeError.message("PC sent media while forwarding was disabled.") }
