@@ -17,6 +17,19 @@ No project-wide license has been selected for TwinDesk's own code.
 Windows publish output contains its dependency license files. The Mac build
 includes the m1ddc license in the app bundle.
 
+- **SSH.NET 2026.0.0**, Renci and contributors, MIT. Used internally for the
+  password-prompted Mac startup-disk unlock.
+  [License](windows/third_party/sshnet/LICENSE.txt),
+  [upstream](https://github.com/sshnet/SSH.NET).
+- **BouncyCastle.Cryptography 2.7.0**, The Legion of the Bouncy Castle Inc., MIT.
+  Transitive SSH.NET dependency.
+  [License](windows/third_party/bouncycastle/LICENSE.md).
+- **Microsoft.Extensions.Logging.Abstractions 8.0.3** and
+  **Microsoft.Extensions.DependencyInjection.Abstractions 8.0.2**, .NET Foundation,
+  MIT. Transitive SSH.NET dependencies.
+  [License](windows/third_party/dotnet-extensions/LICENSE.TXT) and
+  [notices](windows/third_party/dotnet-extensions/THIRD-PARTY-NOTICES.TXT).
+
 The optional Mac Calls helper uses OBS Virtual Camera, which is installed
 separately and is not redistributed in this repository:
 

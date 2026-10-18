@@ -13,8 +13,12 @@
   <ItemGroup>
     <Content Include="../../third_party/naudio/LICENSE.txt" Link="licenses/NAudio-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../third_party/dotnet-tensors/*.TXT" Link="licenses/dotnet-tensors/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../third_party/sshnet/LICENSE.txt" Link="licenses/sshnet/LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../third_party/bouncycastle/LICENSE.md" Link="licenses/bouncycastle/LICENSE.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../third_party/dotnet-extensions/*.TXT" Link="licenses/dotnet-extensions/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="NAudio.Wasapi" Version="3.1.0" />
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
   </ItemGroup>
 </Project>

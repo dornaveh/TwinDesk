@@ -34,6 +34,7 @@ public sealed class MainForm : Form
     private bool audioVerified;
     private long previousAudio;
     private CancellationTokenSource? operation;
+    private MacUnlockForm? macUnlock;
 
     public MainForm(bool startInTray = false, bool autoConnect = false)
     {
@@ -79,7 +80,9 @@ public sealed class MainForm : Form
         Add(layout, new Label { Text = "Connect each monitor to the Mac as well as the PC. Enable input switching after pairing.\nAudio stays connected when you switch. The PC must remain awake for audio and file access.", AutoSize = true }, 52);
         var tools = new FlowLayoutPanel { Dock = DockStyle.Fill };
         var scan = Button("Refresh monitors"); var guide = Button("Setup guide"); var storage = Button("Set up Ethernet & drives");
-        tools.Controls.AddRange([scan, guide, storage]); Add(layout, tools, 48);
+        var unlockMac = Button("Unlock Mac");
+        unlockMac.Click += (_, _) => OpenMacUnlock();
+        tools.Controls.AddRange([scan, unlockMac, guide, storage]); Add(layout, tools, 48);
         layout.Controls.Add(log, 0, 12); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         Style(this);
         speakers.ForeColor = Color.Black; speakers.BackColor = Color.White;
@@ -106,6 +109,7 @@ public sealed class MainForm : Form
         connection.ForeColor = Color.FromArgb(113, 211, 196);
         var menu = new ContextMenuStrip();
         menu.Items.Add("Open TwinDesk", null, (_, _) => OpenWindow());
+        menu.Items.Add("Unlock Mac after restart", null, (_, _) => OpenMacUnlock());
         menu.Items.Add("Camera & microphone", null, (_, _) => { media.Show(); media.Activate(); });
         menu.Items.Add("Switch to Mac", null, (_, _) => RequestSwitch(Computer.Mac));
         menu.Items.Add("Return to PC", null, (_, _) => RequestSwitch(Computer.PC));
@@ -162,6 +166,15 @@ public sealed class MainForm : Form
         FormClosing += (_, e) => { if (!quitting && server is not null && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); tray.ShowBalloonTip(2000, "TwinDesk is still running", "Use the tray menu to quit and return control to the PC.", ToolTipIcon.Info); } else { media.CancelCapture(); media.Dispose(); input?.Dispose(); Microsoft.Win32.SystemEvents.SessionSwitch -= SessionChanged; Microsoft.Win32.SystemEvents.PowerModeChanged -= PowerChanged; tray.Dispose(); audioTimer.Dispose(); identity.Dispose(); } };
     }
     private record InputChoice(uint Value, string Name);
+    private void OpenMacUnlock()
+    {
+        if (macUnlock is not null) { macUnlock.Activate(); return; }
+        OpenWindow();
+        using var dialog = new MacUnlockForm(settings, () => server?.Connected == true);
+        macUnlock = dialog;
+        try { dialog.ShowDialog(this); }
+        finally { macUnlock = null; }
+    }
     private void MigrateAudioSelection()
     {
         if (settings.AudioEndpointId is not null || settings.AudioDevice == -1) return;

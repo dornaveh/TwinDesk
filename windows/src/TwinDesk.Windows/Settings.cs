@@ -9,6 +9,8 @@ public sealed class Settings
 {
     public string BindAddress { get; set; } = "127.0.0.1";
     public int Port { get; set; } = 48150;
+    public string MacHost { get; set; } = "";
+    public string MacUsername { get; set; } = "";
     public int AudioDevice { get; set; } = -1;
     public string AudioDeviceName { get; set; } = "Windows default output";
     public string? AudioEndpointId { get; set; }

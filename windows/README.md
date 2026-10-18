@@ -126,3 +126,25 @@ use IAudioClient3's supported minimum period. A 40 ms maximum application queue
 discards old frames after a burst, without intentionally waiting to fill it.
 Recovery clears queued audio instead of replaying stale sound. Brief gaps while
 a device opens are expected; Bluetooth adds its own delay.
+# Unlock the Mac after a restart
+
+Choose **Unlock Mac** in the Windows window, or **Unlock Mac after restart** in
+the tray menu. Enter the Mac address, local account name and password. Only the
+address and account name are saved. The password stays in memory for the current
+attempt and is not written to settings, logs, process arguments or environment
+variables.
+
+This uses Apple's FileVault unlock over SSH on Apple silicon with macOS 26 or
+later. Remote Login must already be enabled. The Mac's SSH host key must already
+be verified in the current Windows user's OpenSSH `known_hosts` file. Unknown,
+changed and revoked keys are rejected before sending the password.
+
+**Unlocking the startup disk does not sign in to the macOS desktop.** TwinDesk
+reports these as separate states and starts the Mac app only if the matching
+account already owns the desktop. It does not turn off FileVault, enable
+automatic login, or provide pre-login keyboard/mouse injection. The Mac's
+existing login startup entry reconnects once the user signs in.
+
+Qualification: 29 unlock/host-identity/UI checks and a live password-free host-key
+handshake passed on Windows. Windows x64 publish passed. A restart followed by
+real-password FileVault unlock through this UI has not been live-qualified.
