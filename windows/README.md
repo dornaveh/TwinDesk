@@ -126,25 +126,43 @@ use IAudioClient3's supported minimum period. A 40 ms maximum application queue
 discards old frames after a burst, without intentionally waiting to fill it.
 Recovery clears queued audio instead of replaying stale sound. Brief gaps while
 a device opens are expected; Bluetooth adds its own delay.
-# Unlock the Mac after a restart
+## Sign in to the Mac after a restart
 
-Choose **Unlock Mac** in the Windows window, or **Unlock Mac after restart** in
-the tray menu. Enter the Mac address, local account name and password. Only the
-address and account name are saved. The password stays in memory for the current
-attempt and is not written to settings, logs, process arguments or environment
-variables.
+One-time setup on the signed-in Mac:
 
-This uses Apple's FileVault unlock over SSH on Apple silicon with macOS 26 or
-later. Remote Login must already be enabled. The Mac's SSH host key must already
-be verified in the current Windows user's OpenSSH `known_hosts` file. Unknown,
-changed and revoked keys are rejected before sending the password.
+1. Enable **Remote Login** for your account in System Settings → General → Sharing.
+2. Enable **Screen Sharing**. Open its information button, select **Only these
+   users**, and add your Mac account. Leave **VNC viewers may control screen with
+   password** off; TwinDesk authenticates with your Mac account.
+3. Verify the Mac's SSH host key once using Windows OpenSSH. TwinDesk uses the
+   current Windows user's `known_hosts` file; unknown, changed, or revoked keys
+   are rejected before sending a password.
 
-**Unlocking the startup disk does not sign in to the macOS desktop.** TwinDesk
-reports these as separate states and starts the Mac app only if the matching
-account already owns the desktop. It does not turn off FileVault, enable
-automatic login, or provide pre-login keyboard/mouse injection. The Mac's
-existing login startup entry reconnects once the user signs in.
+Choose **Sign in to Mac** in the Windows window, or **Sign in to Mac after
+restart** in the tray menu. Enter the Mac address, local account name, and Mac
+password. Only the address and account name are saved. The password stays in
+memory for this attempt and is not written to settings, logs, process arguments,
+or environment variables.
 
-Qualification: 29 unlock/host-identity/UI checks and a live password-free host-key
-handshake passed on Windows. Windows x64 publish passed. A restart followed by
-real-password FileVault unlock through this UI has not been live-qualified.
+On Apple silicon with macOS 26 or later, TwinDesk first unlocks FileVault over
+SSH and waits for macOS to start. If the account is already signed in, it starts
+the Mac companion. Otherwise a temporary Mac sign-in view opens inside Windows.
+Click your account and sign in using the PC's keyboard and mouse. This view uses
+Apple account authentication inside a host-verified SSH tunnel; screen traffic
+and input stay inside that tunnel. It has no clipboard integration. Account names
+and passwords must each fit within 63 UTF-8 bytes for Apple's legacy account
+authentication protocol; longer values are rejected without truncation.
+
+The view closes once the normal TwinDesk connection returns. You can then switch
+computers normally. Closing the view early keeps control on Windows. The flow
+does not disable FileVault, enable automatic login, switch monitor inputs, or
+sign out another account. Mac login startup must be configured for subsequent
+automatic reconnection.
+
+Qualification: 61 protocol checks and 29 unlock/host-identity/UI checks passed,
+including cancellation, fragmented screen updates, authentication refusal, and
+bounded image/message sizes. Windows x64 publish passed. The real Mac's SSH host
+identity and Screen Sharing account-authentication availability were verified
+without a password. Real-password login and the full FileVault-restart-to-desktop
+flow still require live qualification; simulated protocol checks do not establish
+that those steps work on a particular macOS release.

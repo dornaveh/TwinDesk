@@ -80,7 +80,7 @@ public sealed class MainForm : Form
         Add(layout, new Label { Text = "Connect each monitor to the Mac as well as the PC. Enable input switching after pairing.\nAudio stays connected when you switch. The PC must remain awake for audio and file access.", AutoSize = true }, 52);
         var tools = new FlowLayoutPanel { Dock = DockStyle.Fill };
         var scan = Button("Refresh monitors"); var guide = Button("Setup guide"); var storage = Button("Set up Ethernet & drives");
-        var unlockMac = Button("Unlock Mac");
+        var unlockMac = Button("Sign in to Mac");
         unlockMac.Click += (_, _) => OpenMacUnlock();
         tools.Controls.AddRange([scan, unlockMac, guide, storage]); Add(layout, tools, 48);
         layout.Controls.Add(log, 0, 12); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -109,7 +109,7 @@ public sealed class MainForm : Form
         connection.ForeColor = Color.FromArgb(113, 211, 196);
         var menu = new ContextMenuStrip();
         menu.Items.Add("Open TwinDesk", null, (_, _) => OpenWindow());
-        menu.Items.Add("Unlock Mac after restart", null, (_, _) => OpenMacUnlock());
+        menu.Items.Add("Sign in to Mac after restart", null, (_, _) => OpenMacUnlock());
         menu.Items.Add("Camera & microphone", null, (_, _) => { media.Show(); media.Activate(); });
         menu.Items.Add("Switch to Mac", null, (_, _) => RequestSwitch(Computer.Mac));
         menu.Items.Add("Return to PC", null, (_, _) => RequestSwitch(Computer.PC));

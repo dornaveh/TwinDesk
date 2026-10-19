@@ -8,8 +8,10 @@ to both computers, so the picture follows the keyboard and mouse.
 been used successfully on real hardware. Monitor input control remains
 hardware-dependent and intermittent on the tested dual Samsung U32J59x setup.
 Keep access to the monitors' physical input controls and a spare Mac keyboard
-or mouse during setup. This is not a replacement for hardware input at boot,
-FileVault unlock, recovery, or protected Windows desktops.
+or mouse during setup. A separate Windows sign-in flow supports FileVault unlock
+and macOS login after the one-time setup described in the
+[Windows instructions](windows/README.md#sign-in-to-the-mac-after-a-restart).
+Recovery and protected Windows desktops still need local input.
 
 ## What it does
 
