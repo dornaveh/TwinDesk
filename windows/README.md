@@ -165,6 +165,9 @@ bounded image/message sizes. Windows x64 publish passed. The real Mac's SSH host
 identity and Screen Sharing account-authentication availability were verified
 without a password. Read-only commands also succeeded against the real Mac's
 login window using the production channel-open setting and the existing agent
-SSH key. Real-password login and the full FileVault-restart-to-desktop
-flow still require live qualification; simulated protocol checks do not establish
-that those steps work on a particular macOS release.
+SSH key. Real-password Screen Sharing sign-in through Windows was then completed
+on the tested Mac, followed by TwinDesk reconnection, keyboard/mouse switching
+to Mac and back, and audio reaching Windows. That restart required a channel-open
+fix before sign-in succeeded; FileVault unlock through the final build still
+needs a fresh qualification. These results do not establish monitor switching
+reliability or compatibility with other macOS releases.
