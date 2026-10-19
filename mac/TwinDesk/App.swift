@@ -141,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             Toggle("Use PC camera automatically with microphone", isOn: Binding(get: { calls.state?.automaticCameraEnabled ?? false }, set: { calls.send($0 ? "enableAutomaticCamera" : "disableAutomaticCamera") }))
             Toggle("Use PC microphone automatically", isOn: Binding(get: { calls.state?.microphoneEnabled ?? false }, set: { calls.send($0 ? "enableMicrophone" : "disableMicrophone") }))
+            Text(calls.microphoneMeter)
             if let state = calls.state { Text(state.videoStatus); Text(state.micStatus) }
             if !calls.error.isEmpty { Text(calls.error) }
             Button("Camera & microphone settings…") { calls.launch(background: false) }

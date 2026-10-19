@@ -3,11 +3,6 @@ using NAudio.Wave;
 
 namespace TwinDesk;
 
-public sealed record MicrophoneDevice(string Id, string Name)
-{
-    public override string ToString() => Name;
-}
-
 public sealed class MicrophoneCapture : IAsyncDisposable
 {
     private readonly MMDevice endpoint;
@@ -20,8 +15,31 @@ public sealed class MicrophoneCapture : IAsyncDisposable
         using var enumerator = new MMDeviceEnumerator();
         var result = new List<MicrophoneDevice>();
         foreach (var device in enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
-            using (device) result.Add(new(device.ID, device.FriendlyName));
+            using (device) result.Add(Describe(device));
         return result;
+    }
+    public static MicrophoneDevice? Describe(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return null;
+        try
+        {
+            using var enumerator = new MMDeviceEnumerator();
+            using var device = enumerator.GetDevice(id);
+            return Describe(device);
+        }
+        catch { return null; } // A legacy endpoint may have been removed entirely.
+    }
+    private static MicrophoneDevice Describe(MMDevice device)
+    {
+        var container = "";
+        try
+        {
+            // PKEY_Device_ContainerId, defined by the Windows SDK.
+            var key = new PropertyKey(new Guid("8c7ed206-3f8a-4827-b3ab-ae9e1faefc6c"), 2);
+            if (device.Properties.TryGetValue<Guid>(key, out var value) && value != Guid.Empty) container = value.ToString("D");
+        }
+        catch { /* Some drivers do not expose physical device identity. */ }
+        return new(device.ID, device.FriendlyName, container);
     }
     // Construct only after explicit opt-in and a ready authenticated microphone connection.
     public MicrophoneCapture(string id, Action<byte[]> send, Action<string> failed)

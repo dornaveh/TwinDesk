@@ -107,6 +107,20 @@ protected, locked, encrypted and cloud-only files retain their restrictions.
 `Remove-FileSharing.ps1 -WhatIf` previews removing the two shares and two named
 firewall rules. Applying it keeps the files and Ethernet configuration.
 
+## Remembered microphone selection
+
+Camera and microphone choices are restored independently. TwinDesk remembers the
+microphone's endpoint, name, and physical device container when Windows exposes
+it. It first matches the exact endpoint, then the same hardware; drivers without
+hardware identity can use a unique saved name. Ambiguous devices require a user
+selection, and TwinDesk never substitutes the first or default microphone.
+
+If the saved device is absent or capture fails, the choice and sharing preference
+remain saved. Device enumeration retries every three seconds, including while
+the camera is active. Forwarding resumes only when the selected microphone is
+available and an authenticated Mac calling app requests it. Turning sharing off
+explicitly disables restoration.
+
 ## Audio
 
 Select **Windows default output** to have Mac audio follow the current Windows

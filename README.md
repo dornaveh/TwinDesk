@@ -13,6 +13,9 @@ and macOS login after the one-time setup described in the
 [Windows instructions](windows/README.md#sign-in-to-the-mac-after-a-restart).
 Recovery and protected Windows desktops still need local input.
 
+See [current validation and known limits](VALIDATION.md) for the checks and live
+hardware results behind this preview.
+
 ## What it does
 
 - Shares keyboard and mouse over an authenticated, encrypted network connection.

@@ -11,6 +11,7 @@ private struct CallStatus: Codable {
     let cameraEnabled: Bool
     let automaticCameraEnabled: Bool
     let microphoneEnabled: Bool
+    let micPeak: Float?
     let videoStatus: String
     let micStatus: String
     let speakerStatus: String
@@ -40,7 +41,7 @@ extension CallModel {
         mediaChanged()
     }
     func publishMenuStatus() {
-        let status = CallStatus(updated: Date(), cameraEnabled: cameraEnabled, automaticCameraEnabled: automaticCameraEnabled, microphoneEnabled: microphoneEnabled,
+        let status = CallStatus(updated: Date(), cameraEnabled: cameraEnabled, automaticCameraEnabled: automaticCameraEnabled, microphoneEnabled: microphoneEnabled, micPeak: micPeak,
             videoStatus: videoStatus, micStatus: micStatus, speakerStatus: speakerStatus)
         let url = menuDirectory.appendingPathComponent("menu-status.json")
         if let bytes = try? JSONEncoder().encode(status) {

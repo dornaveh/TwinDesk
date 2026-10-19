@@ -18,7 +18,7 @@ Windows publish output contains its dependency license files. The Mac build
 includes the m1ddc license in the app bundle.
 
 - **SSH.NET 2026.0.0**, Renci and contributors, MIT. Used internally for the
-  password-prompted Mac startup-disk unlock.
+  password-prompted Mac startup-disk unlock and the SSH tunnel for Mac sign-in.
   [License](windows/third_party/sshnet/LICENSE.txt),
   [upstream](https://github.com/sshnet/SSH.NET).
 - **BouncyCastle.Cryptography 2.7.0**, The Legion of the Bouncy Castle Inc., MIT.

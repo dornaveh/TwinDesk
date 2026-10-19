@@ -17,6 +17,8 @@ public sealed class MediaSharingForm : Form
     private MicrophoneCapture? microphone;
     private bool enumerating;
     private bool restoring;
+    private bool restoringDevices;
+    private readonly System.Windows.Forms.Timer deviceRestoreTimer = new() { Interval = 3000 };
     private int cameraGeneration, micGeneration;
 
     public MediaSharingForm(Settings settings)
@@ -47,7 +49,10 @@ public sealed class MediaSharingForm : Form
                 cameraStatus.Text = "Paste this code into TwinDesk Calls on the Mac. Keep it private; it authorizes media sharing.";
             } catch (Exception e) { cameraStatus.Text = e.Message; }
         };
-        layout.Controls.Add(new Label { Text = "On the Mac, select OBS Virtual Camera and TwinDesk Microphone in your calling app.\nAutomatic camera mode follows microphone use. Manual Start/Stop is also available in the Mac menu. Your device choices and permissions are remembered.", AutoSize = true, MaximumSize = new Size(550, 0) });
+        layout.Controls.Add(new Label { Text = "On the Mac, select OBS Virtual Camera and TwinDesk Microphone in your calling app.\nStart/stop the camera from the Mac menu. The microphone runs only while a Mac app uses it. Your device choices and permissions are remembered.", AutoSize = true, MaximumSize = new Size(550, 0) });
+        microphones.SelectedIndexChanged += (_, _) => {
+            if (!restoring && microphones.SelectedItem is MicrophoneDevice device) RememberMicrophone(device);
+        };
         shareCamera.CheckedChanged += (_, _) => {
             if (restoring) return;
             if (shareCamera.Checked && cameras.SelectedItem is not WebcamDevice) { shareCamera.Checked = false; cameraStatus.Text = "Choose a camera first."; return; }
@@ -66,7 +71,7 @@ public sealed class MediaSharingForm : Form
             microphone?.Cancel(); Interlocked.Increment(ref micGeneration);
             server?.SetMicrophoneSharing(shareMic.Checked);
             microphones.Enabled = !shareMic.Checked;
-            settings.MicrophoneDeviceId = (microphones.SelectedItem as MicrophoneDevice)?.Id ?? "";
+            if (microphones.SelectedItem is MicrophoneDevice device) RememberMicrophone(device);
             settings.MicrophoneAllowed = shareMic.Checked;
             SaveDeviceChoices(); _ = Reconcile();
             if (!shareMic.Checked) micStatus.Text = "Microphone is off.";
@@ -74,6 +79,12 @@ public sealed class MediaSharingForm : Form
         refresh.Click += async (_, _) => await RestorePermissions(server);
         Shown += async (_, _) => { if (cameras.Items.Count == 0 && microphones.Items.Count == 0) await RestorePermissions(server); };
         FormClosing += (_, e) => { if (e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); } };
+        deviceRestoreTimer.Tick += async (_, _) => {
+            if (server is not null && (settings.MicrophoneAllowed && !shareMic.Checked || settings.CameraAllowed && !shareCamera.Checked))
+                await RestorePermissions(server);
+        };
+        Disposed += (_, _) => deviceRestoreTimer.Dispose();
+        deviceRestoreTimer.Start();
         _ = Handle; // Background connection callbacks can post even while this window is hidden.
         UpdateAvailability();
     }
@@ -81,21 +92,53 @@ public sealed class MediaSharingForm : Form
     {
         try { settings.Save(); } catch (Exception e) { cameraStatus.Text = "Could not save device selection: " + e.Message; }
     }
+    private void RememberMicrophone(MicrophoneDevice device)
+    {
+        if (settings.MicrophoneDeviceId == device.Id && settings.MicrophoneDeviceName == device.Name && settings.MicrophoneContainerId == device.ContainerId) return;
+        settings.MicrophoneDeviceId = device.Id;
+        settings.MicrophoneDeviceName = device.Name;
+        settings.MicrophoneContainerId = device.ContainerId;
+        SaveDeviceChoices();
+    }
     private async Task RefreshDevices()
     {
-        if (enumerating || shareCamera.Checked || shareMic.Checked) return;
+        if (enumerating) return;
         enumerating = true;
         try
         {
-            var devices = await WebcamCapture.DevicesAsync();
-            cameras.Items.Clear(); cameras.Items.AddRange(devices.Cast<object>().ToArray());
-            cameras.SelectedItem = devices.FirstOrDefault(d => d.Id == settings.CameraDeviceId);
-            // No automatic first-device selection: the user chooses the device being shared.
-            var inputs = MicrophoneCapture.Devices();
-            microphones.Items.Clear(); microphones.Items.AddRange(inputs.Cast<object>().ToArray());
-            microphones.SelectedItem = inputs.FirstOrDefault(d => d.Id == settings.MicrophoneDeviceId);
-            cameraStatus.Text = devices.Count == 0 ? "No cameras found. Connect a camera and refresh." : "Choose a camera, then enable sharing.";
-            micStatus.Text = inputs.Count == 0 ? "No microphones found. Connect a microphone and refresh." : "Choose a microphone, then enable sharing.";
+            // Refresh each inactive medium independently: an enabled camera
+            // must not prevent a late USB microphone from being restored.
+            if (!shareCamera.Checked)
+            {
+                try {
+                    var devices = await WebcamCapture.DevicesAsync();
+                    if (IsDisposed) return;
+                    restoring = true;
+                    try {
+                        cameras.Items.Clear(); cameras.Items.AddRange(devices.Cast<object>().ToArray());
+                        cameras.SelectedItem = devices.FirstOrDefault(d => d.Id == settings.CameraDeviceId);
+                    } finally { restoring = false; }
+                    cameraStatus.Text = devices.Count == 0 ? "No cameras found. Connect a camera and refresh." : "Choose a camera, then enable sharing.";
+                } catch (Exception e) { cameraStatus.Text = "Could not list cameras: " + e.Message; }
+            }
+            if (!shareMic.Checked)
+            {
+                // Migrate old settings while Windows still knows the saved
+                // endpoint, even if that endpoint is currently inactive.
+                if (string.IsNullOrEmpty(settings.MicrophoneDeviceName) && MicrophoneCapture.Describe(settings.MicrophoneDeviceId) is MicrophoneDevice saved)
+                    RememberMicrophone(saved);
+                var inputs = MicrophoneCapture.Devices();
+                var selected = MicrophoneSelection.Resolve(inputs, settings.MicrophoneDeviceId, settings.MicrophoneDeviceName, settings.MicrophoneContainerId);
+                restoring = true;
+                try {
+                    microphones.Items.Clear(); microphones.Items.AddRange(inputs.Cast<object>().ToArray());
+                    microphones.SelectedItem = selected;
+                } finally { restoring = false; }
+                if (selected is not null) RememberMicrophone(selected);
+                micStatus.Text = settings.MicrophoneAllowed && selected is null
+                    ? "Waiting for the saved microphone. Sharing will resume when it is available."
+                    : inputs.Count == 0 ? "No microphones found. Connect a microphone and refresh." : "Choose a microphone, then enable sharing.";
+            }
         }
         catch (Exception e) { cameraStatus.Text = "Could not list devices: " + e.Message; }
         finally { enumerating = false; UpdateAvailability(); }
@@ -125,10 +168,14 @@ public sealed class MediaSharingForm : Form
     }
     private async Task RestorePermissions(BridgeServer? expected)
     {
+        if (restoringDevices || IsDisposed) return;
+        restoringDevices = true;
         try
         {
             await RefreshDevices();
             if (IsDisposed || server != expected) return;
+            var previousCamera = shareCamera.Checked;
+            var previousMic = shareMic.Checked;
             restoring = true;
             try
             {
@@ -138,11 +185,24 @@ public sealed class MediaSharingForm : Form
             finally { restoring = false; }
             cameras.Enabled = modes.Enabled = !shareCamera.Checked;
             microphones.Enabled = !shareMic.Checked;
-            server?.SetCameraSharing(shareCamera.Checked);
-            server?.SetMicrophoneSharing(shareMic.Checked);
+            if (previousCamera != shareCamera.Checked) server?.SetCameraSharing(shareCamera.Checked);
+            if (previousMic != shareMic.Checked) server?.SetMicrophoneSharing(shareMic.Checked);
             await Reconcile();
         }
         catch (Exception e) { if (!IsDisposed) cameraStatus.Text = "Could not restore sharing: " + e.Message; }
+        finally { restoringDevices = false; }
+    }
+    private void SuspendMicrophone(string error)
+    {
+        // Hardware/capture failure is temporary; only the user's checkbox
+        // action may revoke the saved sharing preference or device choice.
+        restoring = true;
+        try { shareMic.Checked = false; }
+        finally { restoring = false; }
+        microphone?.Cancel(); Interlocked.Increment(ref micGeneration);
+        server?.SetMicrophoneSharing(false);
+        microphones.Enabled = true;
+        micStatus.Text = error + " Retrying the saved microphone automatically.";
     }
     public void CancelCapture()
     {
@@ -226,16 +286,18 @@ public sealed class MediaSharingForm : Form
                 {
                     var device = microphones.SelectedItem as MicrophoneDevice ?? throw new IOException("Choose a microphone first.");
                     runningMicGeneration = Volatile.Read(ref micGeneration);
-                    microphone = new MicrophoneCapture(device.Id, server.MediaSender(true), error => Post(() => { shareMic.Checked = false; micStatus.Text = error; }));
+                    var generation = runningMicGeneration;
+                    microphone = new MicrophoneCapture(device.Id, server.MediaSender(true), error => Post(() => {
+                        if (generation == Volatile.Read(ref micGeneration)) SuspendMicrophone(error);
+                    }));
                     if (runningMicGeneration != Volatile.Read(ref micGeneration) || !shareMic.Checked || server?.MicrophoneConnected != true)
                     { var old = microphone; microphone = null; await old.DisposeAsync(); }
                     else { microphone.Start(); micStatus.Text = "Sharing microphone with the Mac."; }
                 }
                 catch (Exception e)
                 {
-                    shareMic.Checked = false;
+                    SuspendMicrophone("Microphone unavailable: " + e.Message);
                     if (microphone is not null) { var old = microphone; microphone = null; await old.DisposeAsync(); }
-                    micStatus.Text = "Microphone unavailable: " + e.Message + " Check Windows microphone permissions.";
                 }
             }
             if (shareCamera.Checked && camera is null) cameraStatus.Text = "Camera idle · start the camera from the Mac menu.";

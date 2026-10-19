@@ -20,6 +20,8 @@ public sealed class Settings
     public bool CameraAllowed { get; set; }
     public bool MicrophoneAllowed { get; set; }
     public string MicrophoneDeviceId { get; set; } = "";
+    public string MicrophoneDeviceName { get; set; } = "";
+    public string MicrophoneContainerId { get; set; } = "";
     public List<MonitorRoute> Monitors { get; set; } = [];
     public static string DataDirectory { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TwinDesk");
     public static string PathFor(string name) => Path.Combine(DataDirectory, name);

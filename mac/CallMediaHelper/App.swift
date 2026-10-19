@@ -8,6 +8,7 @@ import OSLog
     @Published var setup = ""
     @Published var videoStatus = "Camera stopped"
     @Published var micStatus = "Microphone stopped"
+    @Published var micPeak: Float?
     @Published var speakerStatus = "Speaker audio stopped"
     @Published var running = false
     @Published var cameraEnabled = false
@@ -19,6 +20,7 @@ import OSLog
     private let mic = CallMediaConnection(.microphone)
     private let speakers = CallMediaConnection(.speakers)
     private var safetyTimer: Timer?
+    private var statusTimer: Timer?
     private let demandMonitor = MediaDemandMonitor()
     private var cameraPolicy = CameraDemandPolicy(automatic: UserDefaults.standard.object(forKey: "automaticCameraEnabled") as? Bool ?? true)
     private var wakeObservers: [NSObjectProtocol] = []
@@ -27,6 +29,7 @@ import OSLog
     init() {
         video.report = { [weak self] message in DispatchQueue.main.async { self?.videoStatus = message; self?.logger.info("Camera: \(message, privacy: .public)") } }
         mic.report = { [weak self] message in DispatchQueue.main.async { self?.micStatus = message; self?.logger.info("Microphone: \(message, privacy: .public)") } }
+        mic.microphonePeak = { [weak self] peak in DispatchQueue.main.async { self?.micPeak = peak } }
         speakers.report = { [weak self] message in DispatchQueue.main.async { self?.speakerStatus = message; self?.logger.info("Speakers: \(message, privacy: .public)") } }
         if let data = try? Data(contentsOf: configURL), data.count < 8192 {
             setup = data.base64EncodedString()
@@ -43,6 +46,9 @@ import OSLog
                 self.stop()
                 self.speakerStatus = "Speaker routing conflict detected. TwinDesk setup needs to complete the audio handoff."
             }
+        }
+        statusTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.publishMenuStatus() }
         }
         wakeObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.stop() }
@@ -87,6 +93,7 @@ import OSLog
         cameraEnabled = false
         video.setDemand(false); mic.setDemand(false)
         video.stop(); mic.stop(); speakers.stop(); running = false
+        micPeak = nil
         activePairing = nil
         if let data = try? Data(contentsOf: configURL), data.count < 8192 { setup = data.base64EncodedString() }
     }

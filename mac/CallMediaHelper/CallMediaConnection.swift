@@ -9,6 +9,7 @@ final class CallMediaConnection {
     enum Medium: String { case camera, microphone, speakers }
     let medium: Medium
     var report: ((String) -> Void)?
+    var microphonePeak: ((Float?) -> Void)?
     private let queue: DispatchQueue
     private let camera = VirtualCamera()
     private let microphone = MicrophoneOutput()
@@ -30,6 +31,7 @@ final class CallMediaConnection {
     private var heartbeatPending = false
     private var bootstrapping = false
     private var lastMicrophoneLevelReport = 0.0
+    private var lastMicrophoneStatusReport = 0.0
 
     init(_ medium: Medium) {
         self.medium = medium
@@ -56,6 +58,7 @@ final class CallMediaConnection {
             self.demand = value
             if !value {
                 self.stopOutput(); self.announced = false
+                if self.medium == .microphone { self.microphonePeak?(nil) }
                 self.report?("\(self.medium.rawValue.capitalized) idle · waiting for a calling app.")
             }
             if self.ready { self.sendDemand() }
@@ -109,7 +112,9 @@ final class CallMediaConnection {
             }
             if self.ready && !self.heartbeatPending { self.heartbeatPending = true; self.send(5, Data()) }
             if self.announced && now - self.lastMedia > 2 {
-                self.stopOutput(); self.announced = false; self.report?("Waiting for PC \(self.medium.rawValue)…")
+                self.stopOutput(); self.announced = false
+                if self.medium == .microphone { self.microphonePeak?(nil) }
+                self.report?("Waiting for PC \(self.medium.rawValue)…")
             }
         }
         self.timer = timer; timer.resume(); link.start(queue: queue)
@@ -166,7 +171,10 @@ final class CallMediaConnection {
             guard let status = try JSONSerialization.jsonObject(with: data) as? [String: Any], let enabled = status["enabled"] as? Bool,
                   let message = status["message"] as? String, message.count <= 2048 else { throw BridgeError.message("Invalid media status.") }
             self.enabled = enabled
-            if !enabled { stopOutput(); announced = false }
+            if !enabled {
+                stopOutput(); announced = false
+                if medium == .microphone { microphonePeak?(nil) }
+            }
             if enabled && medium == .speakers {
                 do { _ = try audio.ensureRunning() }
                 catch {
@@ -184,8 +192,12 @@ final class CallMediaConnection {
         else if medium == .microphone && kind == 2 {
             let levels = try microphone.receive(data)
             let now = ProcessInfo.processInfo.systemUptime
-            if now - lastMicrophoneLevelReport >= 1 {
+            if now - lastMicrophoneLevelReport >= 0.2 {
                 lastMicrophoneLevelReport = now
+                microphonePeak?(levels.received)
+            }
+            if now - lastMicrophoneStatusReport >= 1 {
+                lastMicrophoneStatusReport = now
                 func level(_ peak: Float) -> String {
                     peak > 0 ? "\(Int((20 * log10(peak)).rounded())) dBFS" : "silence"
                 }
@@ -231,6 +243,7 @@ final class CallMediaConnection {
     private func close() {
         let link = connection; connection = nil; link?.cancel(); timer?.cancel(); timer = nil
         ready = false; enabled = false; announced = false; heartbeatPending = false; receiving.removeAll(); stopOutput()
+        if medium == .microphone { microphonePeak?(nil) }
     }
     private func failed(_ message: String) {
         close(); session = ""; report?(message)

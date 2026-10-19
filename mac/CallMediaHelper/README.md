@@ -58,6 +58,11 @@ It stops them when that app releases the input, normally within a second.
 Speaker forwarding continues independently. The saved automatic preference
 survives launch and sleep; manual camera sessions end on sleep.
 
+The TwinDesk menu shows a ten-segment PC microphone level meter during a call.
+It reads the existing forwarded audio packets, so it does not open another
+microphone or request another permission. An idle meter means no Mac app is
+using TwinDesk Microphone; the status below it reports PC-side sharing errors.
+
 Speaker forwarding checks its audio route every two seconds. If the default
 Mac output changes or Core Audio resets, the helper recreates its audio-only
 tap and volume monitoring without restarting TwinDesk or reconnecting call

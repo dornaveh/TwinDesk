@@ -52,6 +52,8 @@ final class Connection {
     private var pairing: Pairing?
     private var routes = [DisplayRoute]()
     private let input = InputReceiver()
+    private let displayWake = DisplayWake()
+    private var activationRequest: (ticket: UUID, commandID: String)?
     private var receiving = Data()
     private var wanted = false
     private var ready = false
@@ -159,6 +161,7 @@ final class Connection {
                   let id = p["id"] as? String, let ok = p["ok"] as? Bool else { throw BridgeError.message("Invalid command reply.") }
             guard id == returnRequest else { return }
             returnRequest = nil
+            if ok { displayWake.stop() }
             if !ok { report?(p["error"] as? String ?? "Windows could not accept the return request.") }
         case 3:
             guard let p = try JSONSerialization.jsonObject(with: data) as? [String: String], let id = p["id"], id.count <= 64, let name = p["name"] else { throw BridgeError.message("Invalid command.") }
@@ -166,16 +169,48 @@ final class Connection {
             switch name {
             case "activate", "activateWithDisplays":
                 do {
+                    guard activationRequest == nil else { throw BridgeError.message("Mac activation is already in progress.") }
                     if name == "activateWithDisplays" && routes.count != 2 { throw BridgeError.message("Refresh monitors in the Mac app; both monitors must be connected.") }
-                    try input.activate(); restoreDisplays = name == "activateWithDisplays"
-                    reply(id, true); report?("This Mac is controlled by your PC keyboard and mouse.")
-                } catch { reply(id, false, error.localizedDescription) }
+                    try input.checkAccessibility()
+                    beginActivation(id, withDisplays: name == "activateWithDisplays")
+                } catch {
+                    if activationRequest == nil { input.releaseAll(); displayWake.stop() }
+                    reply(id, false, error.localizedDescription)
+                }
             case "deactivate":
+                if let pending = activationRequest { reply(pending.commandID, false, "Mac activation was cancelled.") }
+                activationRequest = nil; displayWake.stop()
                 input.releaseAll()
                 recover { [weak self] error in self?.reply(id, error == nil, error ?? ""); self?.report?("Control returned to PC. Audio continues.") }
             default: reply(id, false, "Unsupported command.")
             }
         default: throw BridgeError.message("Unexpected network packet.")
+        }
+    }
+    private func beginActivation(_ id: String, withDisplays: Bool) {
+        guard let link = connection else { return }
+        let ticket = UUID()
+        activationRequest = (ticket, id)
+        report?("Waking Mac display outputs…")
+        displayWake.activate(minimumDisplays: withDisplays ? 2 : 1) { [weak self, weak link] result in
+            guard let self, let link else { return }
+            self.queue.async {
+                // A disconnect or a return to Windows cancels pending activation;
+                // a late wake result must never enable input or acknowledge it.
+                guard self.connection === link, self.ready, self.activationRequest?.ticket == ticket else { return }
+                self.activationRequest = nil
+                do {
+                    try result.get()
+                    try self.input.activate() // Recheck trust after asynchronous wake.
+                    self.restoreDisplays = withDisplays
+                    self.reply(id, true)
+                    self.report?("This Mac is controlled by your PC keyboard and mouse.")
+                } catch {
+                    self.input.releaseAll(); self.displayWake.stop()
+                    self.reply(id, false, error.localizedDescription)
+                    self.report?(error.localizedDescription)
+                }
+            }
         }
     }
     private func reply(_ id: String, _ ok: Bool, _ error: String = "") { sendJSON(4, ["id": id, "ok": ok, "error": error]) }
@@ -197,6 +232,7 @@ final class Connection {
         }
     }
     private func recover(_ completion: @escaping (String?) -> Void) {
+        displayWake.stop()
         guard restoreDisplays else { completion(nil); return }
         restoreDisplays = false; recovering = true; let saved = routes
         DispatchQueue.global(qos: .userInitiated).async {
@@ -208,6 +244,7 @@ final class Connection {
     private func end(_ message: String) {
         let old = connection; connection = nil; old?.cancel(); timer?.cancel(); timer = nil
         ready = false; supportsReturnToWindows = false; returnRequest = nil
+        activationRequest = nil; displayWake.stop()
         input.releaseAll(); state?(false); report?(message)
         recover { [weak self] error in
             guard let self else { return }

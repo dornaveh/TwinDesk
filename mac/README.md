@@ -70,6 +70,21 @@ Protected playback such as Apple TV can behave differently with capture or displ
 
 ## Optional login startup
 
+After a restart, the Windows **Sign in to Mac after restart** flow can open a
+temporary Mac login view without a second keyboard or mouse. Set up **Remote
+Login** and **Screen Sharing** for your account once in System Settings →
+General → Sharing. In Screen Sharing's information panel, select **Only these
+users** and add your account; leave the shared VNC-password option off. Verify
+the Mac's SSH host identity from Windows once. FileVault unlock over SSH requires
+Apple silicon and macOS 26 or later. See the
+[Windows sign-in instructions](../windows/README.md#sign-in-to-the-mac-after-a-restart).
+
+When switching to the Mac, TwinDesk wakes its display outputs before enabling
+shared input, waits up to three seconds for the expected displays, and keeps
+them awake during control. Returning to Windows, disconnecting, or cancelling
+activation releases that temporary power assertion. This does not unlock macOS
+or establish that a monitor accepted a DDC input command.
+
 After building and quitting any running installed TwinDesk app:
 
 ```sh

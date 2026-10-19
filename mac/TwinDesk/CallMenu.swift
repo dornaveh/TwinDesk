@@ -6,6 +6,7 @@ struct CallStatus: Codable {
     let cameraEnabled: Bool
     let automaticCameraEnabled: Bool?
     let microphoneEnabled: Bool
+    let micPeak: Float?
     let videoStatus: String
     let micStatus: String
     let speakerStatus: String
@@ -22,7 +23,7 @@ struct CallCommand: Codable {
     private let directory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/TwinDesk Calls")
     init() {
         refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in Task { @MainActor in self?.refresh() } }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in Task { @MainActor in self?.refresh() } }
         launch(background: true)
     }
     private func refresh() {
@@ -30,6 +31,14 @@ struct CallCommand: Codable {
               let value = try? JSONDecoder().decode(CallStatus.self, from: data),
               abs(value.updated.timeIntervalSinceNow) < 4 else { state = nil; return }
         state = value
+    }
+    var microphoneMeter: String {
+        guard let state, state.microphoneEnabled else { return "PC microphone  ▱▱▱▱▱▱▱▱▱▱  off" }
+        guard let peak = state.micPeak, peak.isFinite else { return "PC microphone  ▱▱▱▱▱▱▱▱▱▱  idle" }
+        let decibels = peak > 0 ? max(-54.0, 20.0 * log10(Double(peak))) : -54.0
+        let filled = max(0, min(10, Int(((decibels + 54.0) / 54.0 * 10.0).rounded())))
+        let bars = String(repeating: "▰", count: filled) + String(repeating: "▱", count: 10 - filled)
+        return "PC microphone  \(bars)  " + (peak > 0 ? "\(Int(decibels.rounded())) dBFS" : "silent")
     }
     func send(_ action: String) {
         do {

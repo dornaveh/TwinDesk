@@ -21,8 +21,11 @@ final class InputReceiver {
         71:89,72:91,73:92,74:78,75:86,76:87,77:88,78:69,79:83,80:84,81:85,82:82,83:65,86:10,87:103,88:111]
     private let extendedMap: [Int: CGKeyCode] = [28:76,29:62,53:75,56:61,71:115,72:126,73:116,75:123,77:124,79:119,80:125,81:121,82:114,83:117,91:55,92:54]
 
-    func activate() throws {
+    func checkAccessibility() throws {
         guard AXIsProcessTrusted() else { throw BridgeError.message("Enable TwinDesk in macOS Accessibility settings first.") }
+    }
+    func activate() throws {
+        try checkAccessibility()
         releaseAll()
         point = CGEvent(source: nil)?.location ?? .zero
         caps = CGEventSource.flagsState(.combinedSessionState).contains(.maskAlphaShift)
