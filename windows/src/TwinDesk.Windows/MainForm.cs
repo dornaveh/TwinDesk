@@ -170,7 +170,7 @@ public sealed class MainForm : Form
     {
         if (macUnlock is not null) { macUnlock.Activate(); return; }
         OpenWindow();
-        using var dialog = new MacUnlockForm(settings, () => server?.Connected == true);
+        using var dialog = new MacUnlockForm(settings, () => server?.Connected == true, StartupTrace.Write);
         macUnlock = dialog;
         try { dialog.ShowDialog(this); }
         finally { macUnlock = null; }

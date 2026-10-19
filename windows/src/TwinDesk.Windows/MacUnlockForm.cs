@@ -4,6 +4,7 @@ internal sealed class MacUnlockForm : Form
 {
     private readonly Settings settings;
     private readonly Func<bool> connected;
+    private readonly Action<string>? trace;
     private readonly TextBox host = new() { Width = 480 };
     private readonly TextBox account = new() { Width = 480 };
     private readonly TextBox password = new() { Width = 480, UseSystemPasswordChar = true, MaxLength = 1024 };
@@ -15,9 +16,9 @@ internal sealed class MacUnlockForm : Form
     private DateTime deadline;
     private MacStartupState waitingState;
 
-    internal MacUnlockForm(Settings settings, Func<bool> connected)
+    internal MacUnlockForm(Settings settings, Func<bool> connected, Action<string>? trace = null)
     {
-        this.settings = settings; this.connected = connected;
+        this.settings = settings; this.connected = connected; this.trace = trace;
         Text = "TwinDesk · Sign in to Mac"; ClientSize = new Size(550, 600);
         FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false; MinimizeBox = false;
         StartPosition = FormStartPosition.CenterParent; Font = new Font("Segoe UI", 10);
@@ -66,9 +67,10 @@ internal sealed class MacUnlockForm : Form
         using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(130)); operation = cancel;
         unlock.Enabled = host.Enabled = account.Enabled = false; waiting = false;
         status.Text = "Connecting securely to your Mac…";
+        var stage = "Connecting securely to your Mac";
         try
         {
-            var progress = new Progress<string>(text => { if (!IsDisposed) status.Text = text; });
+            var progress = new Progress<string>(text => { stage = text; trace?.Invoke("Mac sign-in stage: " + text); if (!IsDisposed) status.Text = text; });
             await using var login = await Task.Run(() => new MacStartupClient().SignInAsync(address, username, secret, progress, cancel.Token));
             secret = string.Empty;
             if (IsDisposed) return;
@@ -90,7 +92,20 @@ internal sealed class MacUnlockForm : Form
             deadline = DateTime.UtcNow.AddSeconds(30);
         }
         catch (OperationCanceledException) { if (!IsDisposed) status.Text = "Sign-in was cancelled or timed out. Wait a moment before trying again."; }
-        catch (Exception e) { if (!IsDisposed) status.Text = e is InvalidOperationException ? e.Message : "Could not reach the Mac. Check that it is powered on and connected, then try again."; }
+        catch (Exception e)
+        {
+            // Exception messages can contain server-supplied text. Record only
+            // exception types and code locations, never credentials or messages.
+            var types = new List<string>();
+            for (Exception? cause = e; cause is not null && types.Count < 6; cause = cause.InnerException) types.Add(cause.GetType().Name);
+            trace?.Invoke($"Mac sign-in failed at {stage}: {string.Join(" / ", types)}; {e.StackTrace}");
+            if (!IsDisposed) status.Text = e switch {
+                InvalidOperationException => e.Message,
+                InvalidDataException => "The Mac replied with an unsupported sign-in screen format. TwinDesk recorded the failing step for diagnosis.",
+                EndOfStreamException => "The Mac closed the sign-in screen connection. TwinDesk recorded the failing step for diagnosis.",
+                _ => $"Mac sign-in failed while {stage.TrimEnd('…').ToLowerInvariant()}. TwinDesk recorded the failing step for diagnosis."
+            };
+        }
         finally { secret = string.Empty; operation = null; if (!IsDisposed) unlock.Enabled = host.Enabled = account.Enabled = true; }
     }
 }

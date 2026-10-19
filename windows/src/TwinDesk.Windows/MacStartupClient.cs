@@ -75,7 +75,10 @@ internal sealed class MacSshConnection : IDisposable
                 answered = true; prompt.Response = this.password;
             }
         };
-        var info = new ConnectionInfo(host, 22, username, authentication) { Timeout = TimeSpan.FromSeconds(12), RetryAttempts = 0 };
+        // RetryAttempts counts channel-open attempts, not password attempts.
+        // Zero prevents even the first desktop-status command from being sent.
+        // The prompt handler above independently prevents password retries.
+        var info = new ConnectionInfo(host, 22, username, authentication) { Timeout = TimeSpan.FromSeconds(12), RetryAttempts = 1 };
         info.AuthenticationBanner += (_, e) => { if (MacStartup.ConfirmsDiskUnlock(e.BannerMessage)) confirmed = true; };
         Client = new SshClient(info);
         Client.HostKeyReceived += (_, e) => { e.CanTrust = keys.Trusts(e.HostKey); rejectedHost = !e.CanTrust; };

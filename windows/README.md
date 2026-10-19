@@ -159,10 +159,12 @@ does not disable FileVault, enable automatic login, switch monitor inputs, or
 sign out another account. Mac login startup must be configured for subsequent
 automatic reconnection.
 
-Qualification: 61 protocol checks and 29 unlock/host-identity/UI checks passed,
+Qualification: 61 protocol checks and 31 unlock/host-identity/UI checks passed,
 including cancellation, fragmented screen updates, authentication refusal, and
 bounded image/message sizes. Windows x64 publish passed. The real Mac's SSH host
 identity and Screen Sharing account-authentication availability were verified
-without a password. Real-password login and the full FileVault-restart-to-desktop
+without a password. Read-only commands also succeeded against the real Mac's
+login window using the production channel-open setting and the existing agent
+SSH key. Real-password login and the full FileVault-restart-to-desktop
 flow still require live qualification; simulated protocol checks do not establish
 that those steps work on a particular macOS release.
