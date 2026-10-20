@@ -8,6 +8,7 @@ final class InputReceiver {
     private var point = CGPoint.zero
     private var clicks: [Int: (Double, CGPoint, Int64)] = [:]
     private var caps = false
+    private var wheel = WheelScrollAccumulator()
     var active = false
     private let source = CGEventSource(stateID: .privateState)
     // Windows set-1 physical scan codes to macOS virtual key codes.
@@ -83,7 +84,8 @@ final class InputReceiver {
             postButton(button, down, clicks[button]?.2 ?? 1)
         case "scroll":
             guard let delta = p["delta"] as? Int, (-32768...32768).contains(delta), let horizontal = p["horizontal"] as? Bool else { throw BridgeError.message("Invalid scroll packet.") }
-            let amount = Int32(delta / 40)
+            let amount = wheel.lines(delta: delta, horizontal: horizontal)
+            guard amount != 0 else { return }
             let event = CGEvent(scrollWheelEvent2Source: source, units: .line, wheelCount: 2, wheel1: horizontal ? 0 : amount, wheel2: horizontal ? amount : 0, wheel3: 0)
             event?.flags = flags; event?.post(tap: .cghidEventTap)
         default: throw BridgeError.message("Unknown input action.")
@@ -104,6 +106,7 @@ final class InputReceiver {
     }
     func releaseAll() {
         active = false
+        wheel.reset()
         navigationButtons.removeAll()
         let pressed = keys; keys.removeAll()
         for key in pressed { let e = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false); e?.flags = flags; e?.post(tap: .cghidEventTap) }

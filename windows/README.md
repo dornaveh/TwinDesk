@@ -26,6 +26,16 @@ and pending clicks are released or discarded when changing targets. Injected
 mouse events do not trigger the shortcut. Mac Back/Forward buttons map to
 Command-[ and Command-] in apps supporting those navigation shortcuts.
 
+Wheel events produced by mouse utilities are forwarded while controlling the
+Mac, including high-resolution increments smaller than a wheel notch. TwinDesk's
+own replay events and lower-integrity injected events remain excluded, and
+software-generated button events do not activate the middle-click shortcut.
+The wheel routing regression checks run without system hooks or injected input:
+
+```powershell
+dotnet run --project windows/tests/TwinDesk.Wheel.Tests -c Release
+```
+
 After building and testing, optionally run:
 
 ```powershell

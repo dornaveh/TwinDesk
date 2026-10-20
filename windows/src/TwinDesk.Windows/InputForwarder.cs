@@ -15,7 +15,7 @@ public sealed class InputForwarder : IDisposable
     private readonly MiddleClickGesture middle = new(SystemInformation.DoubleClickTime,
         Math.Max(1, SystemInformation.DoubleClickSize.Width / 2), Math.Max(1, SystemInformation.DoubleClickSize.Height / 2));
     private readonly System.Windows.Forms.Timer middleTimer = new() { Interval = 15 };
-    private const nuint MouseInputTag = 0x5457444D;
+    private const nuint MouseInputTag = MouseInputPolicy.OwnMouseInputTag;
     private int pendingDx, pendingDy;
     private bool disposed;
     private Point anchor;
@@ -72,7 +72,7 @@ public sealed class InputForwarder : IDisposable
     {
         if (code < 0) return CallNextHookEx(0, code, message, pointer);
         var m = Marshal.PtrToStructure<MouseData>(pointer);
-        if (m.Extra == MouseInputTag || !MiddleClickGesture.IsPhysical(m.Flags)) return CallNextHookEx(0, code, message, pointer);
+        if (!MouseInputPolicy.ShouldProcess((uint)message, m.Flags, m.Extra, Remote)) return CallNextHookEx(0, code, message, pointer);
         var wasPending = middle.Pending;
         ApplyMiddle(middle.Advance(Environment.TickCount64));
         if (message == 0x200 && (wasPending || middle.Pending))
